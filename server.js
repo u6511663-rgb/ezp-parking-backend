@@ -1,22 +1,18 @@
-const supabase = require("./supabase");
 const express = require("express");
 const cors = require("cors");
-const { createClient } = require("@supabase/supabase-js");
-
 const path = require("path");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
-// =======================
-// SUPABASE CONNECTION
-// =======================
+
+// Supabase connection
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-// =======================
+/ =======================
 // TEST API
 // =======================
 app.get("/", (req, res) => {
