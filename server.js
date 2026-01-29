@@ -3,10 +3,12 @@ const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
 
+const path = require("path");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
-
+app.use(express.static(__dirname));
 // =======================
 // SUPABASE CONNECTION
 // =======================
@@ -18,8 +20,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // TEST API
 // =======================
 app.get("/", (req, res) => {
-  res.send("EZP Supabase Backend is running!");
+  res.sendFile(path.join(__dirname, "home.html"));
 });
+
 
 // =======================
 // GET ALL BUILDINGS
