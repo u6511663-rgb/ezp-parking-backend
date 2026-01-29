@@ -132,35 +132,17 @@
 </div>
 
 <script>
-const API = "";
+const API = "https://ezp-parking-backend.onrender.com";
 
 async function loadBuildings() {
-  try {
-    const res = await fetch("/api/buildings");
-    const data = await res.json();
-
-    console.log("Buildings:", data);
-
-    const container = document.getElementById("detail");
-    container.innerHTML = "";
-
-    data.forEach(b => {
-      const div = document.createElement("div");
-      div.className = "card";
-      div.innerHTML = `
-        <h3>${b.name}</h3>
-        <p>Total slots: ${b.total_slots}</p>
-      `;
-      container.appendChild(div);
-    });
-
-  } catch (err) {
-    console.error(err);
-  }
+  const res = await fetch(API + "/api/buildings");
+  const data = await res.json();
+  console.log("Buildings:", data);
+  return data; // ✅ IMPORTANT
 }
 
 async function loadStatus(id){
-  const r = await fetch(API + "/buildings/" + id + "/status");
+  const r = await fetch(API + "/api/buildings/" + id + "/status");
   return r.json();
 }
 
@@ -196,7 +178,7 @@ async function renderHome(){
     item.className = "detail-item";
     item.innerHTML = `
       <div class="detail-left">
-        <div class="badge">${b.code}</div>
+        <div class="badge">${b.code || b.id}</div>
         <div>
           <div style="font-weight:800">${b.name}</div>
           <div style="color:var(--accent);margin-top:6px">Free ${stat.free} / ${stat.total}</div>
@@ -210,29 +192,7 @@ async function renderHome(){
     detail.appendChild(item);
   }
 }
-(function applySavedSettings(){
-  const APPEAR_KEY = "ezp_appearance";
-  const ACCENT_KEY = "ezp_accent";
 
-  const mode = localStorage.getItem(APPEAR_KEY) || "system";
-  const accent = localStorage.getItem(ACCENT_KEY) || "#13b5d3";
-
-  // apply accent
-  document.documentElement.style.setProperty("--accent", accent);
-
-  // apply appearance
-  if(mode === "dark"){
-    document.documentElement.style.colorScheme = "dark";
-  } else if(mode === "light"){
-    document.documentElement.style.colorScheme = "light";
-  } else {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
-  }
-})();
 renderHome();
 setInterval(renderHome, 3000);
 </script>
-
-</body>
-</html>
