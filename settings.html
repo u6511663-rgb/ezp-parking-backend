@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!doctype html>
 <html lang="en">
 <head>
@@ -276,3 +277,282 @@ document.querySelectorAll(".accent-tile").forEach(t=>{
 
 </body>
 </html>
+=======
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — Settings</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  /* extra styles specific to the settings page */
+  .section { margin-top:16px; border-radius:12px; padding:14px; background:var(--panel); border:1px solid rgba(255,255,255,0.02) }
+  .option-list { display:flex; flex-direction:column; gap:10px; margin-top:8px }
+  .option { padding:12px 14px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); display:flex; align-items:center; gap:12px; cursor:pointer; border:1px solid rgba(255,255,255,0.02) }
+  .option .icon { width:36px; height:36px; border-radius:8px; display:grid; place-items:center; background:rgba(255,255,255,0.02) }
+  .option .lbl { font-weight:700 }
+  .option.small { padding:10px }
+  .radio-dot { margin-left:auto; width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.08); display:inline-block; background:transparent; box-sizing:border-box }
+  .radio-dot.active { background:var(--accent); border-color:var(--accent) }
+  .accent-row { display:flex; gap:12px; margin-top:12px; align-items:center }
+  .accent-tile { width:64px; height:64px; border-radius:10px; display:grid; place-items:center; cursor:pointer; border:2px solid rgba(255,255,255,0.04) }
+  .accent-tile.selected { box-shadow:0 8px 24px rgba(2,6,12,0.6); border-color:rgba(255,255,255,0.12); outline:3px solid rgba(255,255,255,0.03) }
+  .accent-circle { width:36px; height:36px; border-radius:50% }
+  .conn-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03) }
+  .about-grid { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:8px; align-items:center }
+  .about-grid div { color:var(--muted) }
+  .about-grid .val { color:inherit; font-weight:700; text-align:right }
+  @media (max-width:900px){ .accent-row { flex-wrap:wrap } }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Settings</h1>
+        <div class="small">Customize your experience</div>
+      </div>
+      <div style="text-align:right">
+        <div class="small card" style="display:inline-block">Online • ~2s updates</div>
+      </div>
+    </header>
+
+    <!-- Appearance -->
+    <div class="section">
+      <div style="font-weight:700">Appearance</div>
+      <div class="option-list" id="appearanceList">
+        <div class="option option-light" data-mode="system">
+          <div class="icon">🖥️</div>
+          <div>
+            <div class="lbl">System</div>
+            <div class="small">Follow device theme</div>
+          </div>
+          <div class="radio-dot" data-mode="system"></div>
+        </div>
+
+        <div class="option option-light" data-mode="light">
+          <div class="icon">🌞</div>
+          <div>
+            <div class="lbl">Light</div>
+            <div class="small">Use light appearance</div>
+          </div>
+          <div class="radio-dot" data-mode="light"></div>
+        </div>
+
+        <div class="option option-dark" data-mode="dark">
+          <div class="icon">🌙</div>
+          <div>
+            <div class="lbl">Dark</div>
+            <div class="small">Use dark appearance</div>
+          </div>
+          <div class="radio-dot" data-mode="dark"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accent color -->
+    <div class="section" style="margin-top:12px">
+      <div style="font-weight:700">Accent Color</div>
+      <div class="small" style="margin-top:8px">Pick a color that fits your style</div>
+      <div class="accent-row" id="accentRow">
+        <div class="accent-tile" data-color="#2f63ff" title="EZP Blue">
+          <div class="accent-circle" style="background:#2f63ff"></div>
+        </div>
+        <div class="accent-tile" data-color="#13b5d3" title="Teal">
+          <div class="accent-circle" style="background:#13b5d3"></div>
+        </div>
+        <div class="accent-tile" data-color="#f0a500" title="Amber">
+          <div class="accent-circle" style="background:#f0a500"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connection -->
+    <div class="section" style="margin-top:12px">
+      <div style="font-weight:700">Connection</div>
+      <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center">
+        <div>
+          <div class="small">Real-time updates</div>
+          <div class="small">Live parking availability</div>
+        </div>
+        <div class="conn-chip" id="connChip">
+          <span style="width:12px;height:12px;border-radius:50%;display:inline-block;background:var(--accent)"></span>
+          <div class="small" id="connStatus">Online • ~2 s updates</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- About -->
+    <div class="section" style="margin-top:12px">
+      <div style="font-weight:700">About</div>
+      <div class="about-grid">
+        <div class="small">Version</div><div class="val">1.0.0</div>
+        <div class="small">Build</div><div class="val">2025.10.15</div>
+        <div class="small">IoT Sensors</div><div class="val" id="iotStatus" style="color:var(--accent)">Active</div>
+      </div>
+    </div>
+
+    <div style="height:72px"></div>
+  </div>
+
+  <!-- bottom nav -->
+  <div class="bottom-nav">
+    <button class="nav-btn" data-page="home" onclick="location='home.html'">Home</button>
+    <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
+    <button class="nav-btn" data-page="insights" onclick="location='insights.html'">Insights</button>
+    <button class="nav-btn active" data-page="settings" onclick="location='settings.html'">Settings</button>
+  </div>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — Settings</title>
+
+<link rel="stylesheet" href="common.css">
+
+<style>
+  .section {
+    margin-top:16px;
+    border-radius:12px;
+    padding:14px;
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,0.04);
+  }
+  .option-list { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .option {
+    padding:12px 14px;
+    border-radius:10px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+    display:flex; align-items:center; gap:12px;
+    cursor:pointer; border:1px solid rgba(255,255,255,0.04);
+  }
+  .option * { pointer-events:none; }
+  .icon { width:36px; height:36px; border-radius:8px; display:grid; place-items:center; background:rgba(255,255,255,0.04); }
+  .radio-dot { margin-left:auto; width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.2); }
+  .radio-dot.active { background:var(--accent); border-color:var(--accent); }
+
+  .accent-row { display:flex; gap:12px; margin-top:12px; }
+  .accent-tile { width:64px; height:64px; border-radius:10px; display:grid; place-items:center; cursor:pointer; border:2px solid rgba(255,255,255,0.06); }
+  .accent-tile.selected { outline:3px solid var(--accent); }
+  .accent-circle { width:36px; height:36px; border-radius:50%; }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <div>
+    <h1>Settings</h1>
+    <div class="small">Customize your experience</div>
+  </div>
+</header>
+
+<!-- Appearance -->
+<div class="section">
+  <div style="font-weight:700">Appearance</div>
+
+  <div class="option-list" id="appearanceList">
+    <div class="option" data-mode="system">
+      <div class="icon">🖥️</div>
+      <div><div class="lbl">System</div><div class="small">Follow device theme</div></div>
+      <div class="radio-dot"></div>
+    </div>
+
+    <div class="option" data-mode="light">
+      <div class="icon">🌞</div>
+      <div><div class="lbl">Light</div><div class="small">Use light appearance</div></div>
+      <div class="radio-dot"></div>
+    </div>
+
+    <div class="option" data-mode="dark">
+      <div class="icon">🌙</div>
+      <div><div class="lbl">Dark</div><div class="small">Use dark appearance</div></div>
+      <div class="radio-dot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Accent -->
+<div class="section">
+  <div style="font-weight:700">Accent Color</div>
+  <div class="accent-row">
+    <div class="accent-tile" data-color="#2f63ff"><div class="accent-circle" style="background:#2f63ff"></div></div>
+    <div class="accent-tile" data-color="#13b5d3"><div class="accent-circle" style="background:#13b5d3"></div></div>
+    <div class="accent-tile" data-color="#f0a500"><div class="accent-circle" style="background:#f0a500"></div></div>
+  </div>
+</div>
+
+<div style="height:72px"></div>
+</div>
+
+<!-- bottom nav -->
+<div class="bottom-nav">
+  <button class="nav-btn" onclick="location='home.html'">Home</button>
+  <button class="nav-btn" onclick="location='alerts.html'">Alerts</button>
+  <button class="nav-btn" onclick="location='insights.html'">Insights</button>
+  <button class="nav-btn active">Settings</button>
+</div>
+
+<script>
+
+
+// ---------- APPLY THEME ----------
+function applyAppearance(mode){
+  localStorage.setItem(APPEAR_KEY, mode);
+
+  if(mode === "dark"){
+    document.documentElement.style.colorScheme = "dark";
+  } else if(mode === "light"){
+    document.documentElement.style.colorScheme = "light";
+  } else {
+    // system
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
+  }
+  syncAppearanceUI();
+}
+
+// ---------- APPLY ACCENT ----------
+function applyAccent(color){
+  document.documentElement.style.setProperty("--accent", color);
+  localStorage.setItem(ACCENT_KEY, color);
+
+  document.querySelectorAll(".accent-tile").forEach(t=>{
+    t.classList.toggle("selected", t.dataset.color === color);
+  });
+}
+
+// ---------- UI SYNC ----------
+function syncAppearanceUI(){
+  const mode = localStorage.getItem(APPEAR_KEY) || "system";
+  document.querySelectorAll("#appearanceList .option").forEach(opt=>{
+    opt.querySelector(".radio-dot").classList.toggle("active", opt.dataset.mode === mode);
+  });
+}
+
+// ---------- CLICK EVENTS ----------
+document.querySelectorAll("#appearanceList .option").forEach(opt=>{
+  opt.onclick = ()=> applyAppearance(opt.dataset.mode);
+});
+
+document.querySelectorAll(".accent-tile").forEach(t=>{
+  t.onclick = ()=> applyAccent(t.dataset.color);
+});
+
+// ---------- RESTORE ON LOAD ----------
+(function init(){
+  const savedMode = localStorage.getItem(APPEAR_KEY) || "system";
+  const savedAccent = localStorage.getItem(ACCENT_KEY) || "#13b5d3";
+
+  applyAppearance(savedMode);
+  applyAccent(savedAccent);
+})();
+</script>
+
+</body>
+</html>
+>>>>>>> 5b52d2108aaca35e3490f6eab8daae023e76883b

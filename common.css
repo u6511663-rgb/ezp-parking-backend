@@ -1,3 +1,4 @@
+
 :root{
   /* Core (dark) theme values */
   --bg: #0b1220;
@@ -138,3 +139,145 @@ h1{margin:0;font-size:26px}
   --accent-2: #13b5d3;
   --danger: #e53935;
 }
+
+:root{
+  /* Core (dark) theme values */
+  --bg: #0b1220;
+  --panel: #0f1720;
+  --muted: #98a0b3;
+  --text: #e6eef8;
+  --accent: #19b28b;
+  --accent-2: #0fb07f;
+  --danger: #e25454;
+  --glass: rgba(255,255,255,0.03);
+  --card-radius: 14px;
+}
+.back-btn{
+  background: rgba(255,255,255,0.02);   /* same as icon-btn style in your app */
+  border: 1px solid var(--panel-border);
+  color: var(--muted);                 /* arrow color like screenshot */
+  width: 34px;
+  height: 34px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:18px;
+  line-height:1;
+  padding:0;
+}
+
+.back-btn:hover{
+  background: rgba(255,255,255,0.06);  /* hover glow, same style */
+  color: var(--text);
+}
+/* LIGHT theme override */
+html.light {
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --muted: #6b7380;
+  --text: #0b1220;
+  --accent: #2f63ff;
+  --accent-2: #1f8fe6;
+  --danger: #d43f3f;
+  --glass: rgba(10,10,10,0.02);
+}
+
+
+/* then make sure other rules consume variables (examples) */
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* example usage for panels and cards */
+.card {
+  background: var(--panel);
+  border-radius: var(--card-radius);
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,0.02); /* this may need adjustment for light mode */
+}
+
+/* wide driving lane between rows (rowA→rowB & rowC→rowD) */
+.road-space {
+  height: 46px;                 /* wider than main aisle */
+  margin: 4px 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.015);
+  border-radius: 6px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+
+
+/* progress bar uses --accent */
+.progress > span { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+/* small color uses --muted */
+.small { color: var(--muted); }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#e6eef8}
+.container{max-width:1280px;margin:18px auto;padding:18px}
+h1{margin:0;font-size:26px}
+.muted{color:var(--muted)}
+.controls{display:flex;gap:12px;margin-top:18px}
+.search{flex:1}
+.search input{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.01);color:inherit}
+.chip{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--muted);cursor:pointer}
+.zone{margin-top:18px;border-radius:14px;padding:24px;background:linear-gradient(180deg,#07142a 0%, #0b1830 100%);display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,0.02)}
+.count{font-size:44px;font-weight:800}
+.pct{font-size:32px;color:var(--accent);font-weight:700}
+.list{margin-top:18px;display:flex;flex-direction:column;gap:12px}
+.item{padding:16px;border-radius:12px;background:var(--panel);display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,0.02);cursor:pointer}
+.left{display:flex;gap:12px;align-items:flex-start}
+.badge{background:rgba(12,60,140,0.12);padding:6px 8px;border-radius:8px;font-weight:700;font-size:13px;color:#9cc8ff}
+.loc{color:var(--muted);font-size:13px}
+.progress{width:120px;height:8px;border-radius:8px;background:rgba(255,255,255,0.04);overflow:hidden;margin-top:8px}
+.progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));}
+.bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;display:flex;gap:12px}
+.nav-btn{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px 22px;border-radius:12px;border:0;color:var(--muted);cursor:pointer}
+.nav-btn.active{background:linear-gradient(180deg,#0c2333,#081622);color:var(--accent);box-shadow:0 12px 30px rgba(1,6,9,0.6)}
+.card{background:var(--panel);border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.02)}
+.small{font-size:13px;color:var(--muted)}
+/* Alerts page specifics */
+.alert-item{display:flex;justify-content:space-between;align-items:center;padding:18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.02)}
+.toggle{width:44px;height:24px;border-radius:20px;background:rgba(255,255,255,0.06);position:relative;cursor:pointer}
+.toggle .knob{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white;transition:left .18s}
+.toggle.on{background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.toggle.on .knob{left:23px}
+.icon-btn{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,0.02);display:grid;place-items:center;cursor:pointer}
+:root {
+  /* Dark theme (default) */
+  --bg: #050b16;
+  --panel: #0b1220;
+  --text: #e9f1ff;
+  --muted: #8aa0c6;
+  --panel-border: rgba(255,255,255,0.06);
+
+  --accent: #13b5d3;
+  --accent-2: #19b28b;
+  --danger: #ff5c5c;
+}
+
+:root[data-theme="light"] {
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --text: #0b1220;
+  --muted: #5b6b88;
+  --panel-border: rgba(0,0,0,0.08);
+
+  --accent: #2f63ff;
+  --accent-2: #13b5d3;
+  --danger: #e53935;
+}
+
