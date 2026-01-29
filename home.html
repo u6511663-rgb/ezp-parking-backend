@@ -132,11 +132,31 @@
 </div>
 
 <script>
-const API = "/api";
+const API = "";
 
-async function loadBuildings(){
-  const r = await fetch(API + "/buildings");
-  return r.json();
+async function loadBuildings() {
+  try {
+    const res = await fetch("/api/buildings");
+    const data = await res.json();
+
+    console.log("Buildings:", data);
+
+    const container = document.getElementById("detail");
+    container.innerHTML = "";
+
+    data.forEach(b => {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        <h3>${b.name}</h3>
+        <p>Total slots: ${b.total_slots}</p>
+      `;
+      container.appendChild(div);
+    });
+
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 async function loadStatus(id){
