@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — Floor</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  body{
+    margin:0;
+    font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;
+    background:var(--bg);
+    color:var(--text);
+    
+  }
+  .wrap{max-width:1100px;margin:18px auto;padding:18px}
+
+  /* header */
+  .header{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    margin-bottom:10px;
+  }
+  .back-btn{
+    border:0;
+    background:transparent;
+    color:var(--muted);
+    font-size:20px;
+    cursor:pointer;
+    padding:6px 10px;
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .15s,color .15s;
+  }
+  .back-btn:hover{
+    background:rgba(255,255,255,0.06);
+    color:var(--accent);
+  }
+  .header-main{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .title{font-weight:800;font-size:18px}
+  .subtitle{font-size:13px;color:var(--muted)}
+  .meta{margin-left:auto;color:var(--muted);font-size:13px}
+
+  /* tabs */
+  .tabs{
+    margin-top:6px;
+    display:inline-flex;
+    padding:3px;
+    border-radius:999px;
+    background:rgba(255,255,255,0.04);
+  }
+  .floor-tab{
+    border:0;
+    background:transparent;
+    color:var(--muted);
+    padding:5px 14px;
+    border-radius:999px;
+    font-size:13px;
+    cursor:pointer;
+    transition:background .15s,color .15s;
+    white-space:nowrap;
+  }
+  .floor-tab.active{
+    background:var(--panel);
+    color:var(--accent);
+    box-shadow:0 6px 18px rgba(0,0,0,0.45);
+  }
+
+  /* main panel */
+  .panel{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.03));
+    border-radius:14px;
+    padding:18px;
+    border:1px solid var(--panel-border);
+    box-shadow:0 10px 26px rgba(2,6,12,0.55);
+  }
+  .legend-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:12px;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .legend-group{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .legend-dot{
+    width:10px;height:10px;border-radius:50%;display:inline-block;
+  }
+  .legend-dot.free{background:var(--accent);}
+  .legend-dot.occ{background:var(--danger);}
+  .legend-dot.acc{background:#86c5ff;}
+
+  .sealed-tag{
+    background:rgba(230,100,100,0.08);
+    color:var(--danger);
+    padding:6px 10px;
+    border-radius:10px;
+    font-size:12px;
+  }
+
+  /* parking layout */
+  .parking-layout{
+    padding:14px;
+    border-radius:12px;
+    background:rgba(3,10,20,0.9);
+    border:1px solid rgba(255,255,255,0.03);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  /* row of slots */
+  .slot-row{
+    display:grid;
+    grid-template-columns: repeat(10, minmax(32px,1fr));
+    gap:8px;
+  }
+  .slot-cell{
+    min-height:40px;
+  }
+
+  .slot-tile{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    border-radius:9px;
+    padding:6px 4px;
+    border:2px solid var(--panel-border);
+    background:linear-gradient(180deg,rgba(0,0,0,0.35),rgba(0,0,0,0.16));
+    font-size:11px;
+    font-weight:800;
+    cursor:pointer;
+    min-height:46px;
+    position:relative;
+    transition:transform .12s, box-shadow .12s, border-color .12s, background .12s;
+  }
+  .slot-tile.free{
+    border-color:rgba(25,178,139,0.4);
+    color:var(--accent);
+  }
+  .slot-tile.occupied{
+    border-color:rgba(255,80,80,0.45);
+    color:var(--danger);
+    background:rgba(255,80,80,0.07);
+  }
+  .slot-tile:hover{
+    transform:translateY(-1px);
+    box-shadow:0 4px 18px rgba(0,0,0,0.5);
+  }
+  .slot-code{margin-bottom:2px;}
+  .slot-car{
+    font-size:14px;
+    opacity:.85;
+  }
+  .slot-acc{
+    position:absolute;
+    right:4px;
+    bottom:2px;
+    font-size:11px;
+    opacity:.8;
+  }
+
+  /* lanes / concrete medians (style C) */
+  .lane{
+    border-radius:8px;
+    position:relative;
+    overflow:hidden;
+  }
+  .lane-small{
+    height:26px;
+    background:linear-gradient(180deg,rgba(60,60,60,0.4),rgba(30,30,30,0.6));
+    border-top:1px solid rgba(255,255,255,0.12);
+    border-bottom:1px solid rgba(255,255,255,0.15);
+  }
+  .lane-small::before{
+    content:'';
+    position:absolute;
+    left:8%;
+    right:8%;
+    top:50%;
+    height:2px;
+    border-top:2px dashed rgba(255,255,255,0.3);
+    transform:translateY(-50%);
+  }
+
+  .lane-main{
+    height:38px;
+    background:linear-gradient(180deg,rgba(110,110,110,0.8),rgba(50,50,50,0.9));
+    border:1px solid rgba(255,255,255,0.18);
+  }
+  .lane-main::before{
+    content:'';
+    position:absolute;
+    left:50%;
+    top:4px;
+    bottom:4px;
+    width:3px;
+    border-left:2px dashed rgba(255,255,255,0.7);
+    transform:translateX(-50%);
+  }
+  .lane-main span{
+    position:absolute;
+    right:10px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .entry-exit{
+    display:flex;
+    justify-content:space-between;
+    color:var(--muted);
+    font-size:12px;
+    margin-top:10px;
+    padding:0 4px;
+  }
+
+  /* modal */
+  #modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    align-items:center;
+    justify-content:center;
+    background:rgba(2,3,6,0.6);
+    backdrop-filter:blur(4px);
+    z-index:50;
+  }
+  .modal-card{
+    width:92%;
+    max-width:420px;
+    background:var(--panel);
+    padding:14px;
+    border-radius:12px;
+    border:1px solid var(--panel-border);
+  }
+  .chip{
+    padding:8px 12px;
+    border-radius:8px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    cursor:pointer;
+  }
+
+  @media(max-width:900px){
+    .slot-row{
+      grid-template-columns: repeat(8, minmax(30px,1fr));
+    }
+  }
+  @media(max-width:720px){
+    .wrap{padding:12px}
+    .slot-row{
+      grid-template-columns: repeat(6, minmax(28px,1fr));
+    }
+    .slot-tile{font-size:10px;min-height:40px}
+    .lane-main{height:32px}
+    .lane-small{height:22px}
+  }
+  
+  
+</style>
+</head>
+<body>
+  <!-- Bottom Navigation -->
+<div class="bottom-nav">
+  <button class="nav-btn" data-page="home" onclick="location='home.html'">Home</button>
+  <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
+  <button class="nav-btn" data-page="insights" onclick="location='insights.html'">Insights</button>
+  <button class="nav-btn" data-page="settings" onclick="location='settings.html'">Settings</button>
+</div>
+
+<div class="wrap">
+
+  <div class="header">
+    <button class="back-btn" id="btnBack">←</button>
+    <div class="header-main">
+      <div class="title" id="pageTitle">Floor</div>
+      <div class="subtitle" id="pageSub">—</div>
+      <div class="tabs">
+        <button class="floor-tab active" data-level="GND">Ground</button>
+        <button class="floor-tab" data-level="UPP">Upper deck</button>
+      </div>
+    </div>
+    <div class="meta" id="counts">Free 0 • Occ 0</div>
+  </div>
+
+  <div class="panel">
+    <div class="legend-row">
+      <div class="legend-group">
+        <span class="legend-dot free"></span><span>Free</span>
+        <span class="legend-dot occ" style="margin-left:12px"></span><span>Occupied</span>
+        <span class="legend-dot acc" style="margin-left:12px"></span><span>Accessible</span>
+      </div>
+      <div class="sealed-tag">Old bottom gate sealed</div>
+    </div>
+
+    <div class="parking-layout" id="parkingLayout">
+      <!-- layout rows are inserted here by JS using HTML grids -->
+    </div>
+
+    <div class="entry-exit" id="entryExit">
+      <div>← Entry</div>
+      <div>Exit →</div>
+    </div>
+  </div>
+</div>
+
+<!-- modal -->
+<div id="modal">
+  <div class="modal-card">
+    <div id="modalContent"></div>
+    <div style="text-align:right;margin-top:12px">
+      <button class="chip" id="closeModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:3000/api";
+
+// ===== EXACT SAME LAYOUT MAP =====
+const FLOOR_LAYOUT = {
+  GND: {
+    rows: [
+      ['G01','G02','G03','G04','G05','G06','G07','G08','G09','G10'],
+      'lane-small',
+      ['G11','G12','G13','G14','G15','G16','G17','G18','G19','G20'],
+      'lane-main',
+      ['G21','G22','G23','G24','G25','G26','G27','G28','G29','G30'],
+      'lane-small',
+      ['G31','G32','G33','G34','G35','G36','G37','G38','G39','G40']
+    ]
+  },
+  UPP: {
+    rows: [
+      ['U01','U02','U03','U04','U05','U06','U07','U08','U09', null],
+      'lane-small',
+      ['U10','U11','U12','U13','U14','U15','U16','U17','U18', null],
+      'lane-main',
+      [null,'U19','U20','U21','U22', null, null, null, null, null]
+    ]
+  }
+};
+
+function qs(k){ return new URLSearchParams(location.search).get(k); }
+
+// ===== LOAD REAL SLOTS FROM API =====
+async function loadSlots(floorId){
+  const res = await fetch(API + "/floors/" + floorId + "/slots");
+  return await res.json();
+}
+
+// ===== CREATE SLOT TILE =====
+function createSlotEl(slot){
+  const el = document.createElement("div");
+  el.className = "slot-tile " + (slot.status === "free" ? "free" : "occupied");
+  el.innerHTML = `
+    <div class="slot-code">${slot.code}</div>
+    <div class="slot-car">🚗</div>
+  `;
+  return el;
+}
+
+// ===== RENDER FLOOR =====
+async function renderLayout(level){
+  const buildingId = qs("id"); // from home page click
+  const currentLevel = (level || "GND").toUpperCase();
+
+  // ⚠️ CHANGE THIS IF YOUR FLOOR IDs ARE DIFFERENT IN DB
+  const floorId = currentLevel === "UPP" ? 2 : 1;
+
+  const slots = await loadSlots(floorId);
+
+  const SLOT_MAP = {};
+  let free = 0;
+
+  slots.forEach(s=>{
+    SLOT_MAP[s.code] = s;
+    if(s.status === "free") free++;
+  });
+
+  const total = slots.length;
+  const occ = total - free;
+
+  document.getElementById("counts").textContent = `Free ${free} • Occ ${occ}`;
+
+  document.getElementById("pageTitle").textContent =
+    currentLevel === "UPP" ? "Upper Deck" : "Ground Level";
+
+  const layoutDef = FLOOR_LAYOUT[currentLevel];
+  const layout = document.getElementById("parkingLayout");
+  layout.innerHTML = "";
+
+  layoutDef.rows.forEach(rowDef=>{
+    if(rowDef === "lane-small"){
+      const d = document.createElement("div");
+      d.className = "lane lane-small";
+      layout.appendChild(d);
+    }
+    else if(rowDef === "lane-main"){
+      const d = document.createElement("div");
+      d.className = "lane lane-main";
+      d.innerHTML = "<span>Main drive lane</span>";
+      layout.appendChild(d);
+    }
+    else{
+      const row = document.createElement("div");
+      row.className = "slot-row";
+
+      rowDef.forEach(code=>{
+        const cell = document.createElement("div");
+        cell.className = "slot-cell";
+
+        if(code && SLOT_MAP[code]){
+          cell.appendChild(createSlotEl(SLOT_MAP[code]));
+        }
+
+        row.appendChild(cell);
+      });
+
+      layout.appendChild(row);
+    }
+  });
+}
+(function applySavedSettings(){
+  const APPEAR_KEY = "ezp_appearance";
+  const ACCENT_KEY = "ezp_accent";
+
+  const mode = localStorage.getItem(APPEAR_KEY) || "system";
+  const accent = localStorage.getItem(ACCENT_KEY) || "#13b5d3";
+
+  // apply accent
+  document.documentElement.style.setProperty("--accent", accent);
+
+  // apply appearance
+  if(mode === "dark"){
+    document.documentElement.style.colorScheme = "dark";
+  } else if(mode === "light"){
+    document.documentElement.style.colorScheme = "light";
+  } else {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
+  }
+})();
+// ===== UI EVENTS =====
+document.getElementById("btnBack").onclick = ()=> location="home.html";
+
+document.querySelectorAll(".floor-tab").forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll(".floor-tab").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    renderLayout(btn.dataset.level);
+  };
+});
+
+// ===== INIT =====
+renderLayout("GND");
+
+// ===== AUTO REFRESH =====
+setInterval(()=>{
+  const lvl = document.querySelector(".floor-tab.active")?.dataset.level || "GND";
+  renderLayout(lvl);
+}, 3000);
+</script>
+
+
+</body>
+</html>
