@@ -12,7 +12,7 @@ app.use(express.static(__dirname));
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
-/ =======================
+// =======================
 // TEST API
 // =======================
 app.get("/", (req, res) => {
