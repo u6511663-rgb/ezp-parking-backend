@@ -135,18 +135,25 @@
 const API = "https://ezp-parking-backend.onrender.com";
 
 async function loadBuildings() {
-  const res = await fetch(API + "/api/buildings");
-  const data = await res.json();
-  console.log("Buildings:", data);
-  return data; // ✅ IMPORTANT
+  try {
+    const res = await fetch("/api/buildings");
+    if (!res.ok) throw new Error("API error");
+
+    const data = await res.json();
+    return data; 
+  } catch (err) {
+    console.error("loadBuildings error:", err);
+    return [];
+  }
 }
 
-async function loadStatus(id){
-  const r = await fetch(API + "/api/buildings/" + id + "/status");
-  return r.json();
+async function loadStatus(id) {
+  const res = await fetch(`/api/buildings/${id}/status`);
+  if (!res.ok) throw new Error("Status API error");
+  return res.json();
 }
 
-async function renderHome(){
+async function renderHome() {
   const buildings = await loadBuildings();
 
   const big = document.getElementById("bigCards");
@@ -155,43 +162,55 @@ async function renderHome(){
   big.innerHTML = "";
   detail.innerHTML = "";
 
-  for(const b of buildings){
+  if (!buildings.length) {
+    detail.innerHTML = "<div style='color:var(--muted)'>No data</div>";
+    return;
+  }
+
+  for (const b of buildings) {
     const stat = await loadStatus(b.id);
 
-    const occPct = stat.total ? Math.round((stat.occupied/stat.total)*100) : 0;
+    const occPct = stat.total
+      ? Math.round((stat.occupied / stat.total) * 100)
+      : 0;
 
     // BIG CARD
-    const bigCard = document.createElement("div");
-    bigCard.className = "big-card";
-    bigCard.innerHTML = `
-      <div>
-        <div class="title">${b.name}</div>
-        <div class="count">${stat.free} / ${stat.total}</div>
-        <div class="sub">Free slots</div>
-      </div>
-      <button class="view-btn" onclick="location='floor.html?id=${b.id}'">View</button>
-    `;
-    big.appendChild(bigCard);
-
-    // DETAIL CARD
-    const item = document.createElement("div");
-    item.className = "detail-item";
-    item.innerHTML = `
-      <div class="detail-left">
-        <div class="badge">${b.code || b.id}</div>
+    big.innerHTML += `
+      <div class="big-card">
         <div>
-          <div style="font-weight:800">${b.name}</div>
-          <div style="color:var(--accent);margin-top:6px">Free ${stat.free} / ${stat.total}</div>
+          <div class="title">${b.name}</div>
+          <div class="count">${stat.free} / ${stat.total}</div>
+          <div class="sub">Free slots</div>
+        </div>
+        <button class="view-btn" onclick="location='floor.html?id=${b.id}'">
+          View
+        </button>
+      </div>
+    `;
+
+    // DETAIL
+    detail.innerHTML += `
+      <div class="detail-item">
+        <div class="detail-left">
+          <div class="badge">${b.code}</div>
+          <div>
+            <div style="font-weight:800">${b.name}</div>
+            <div style="color:var(--accent);margin-top:6px">
+              Free ${stat.free} / ${stat.total}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:var(--muted);font-size:12px">just now</div>
+          <div class="progress">
+            <span style="width:${occPct}%"></span>
+          </div>
         </div>
       </div>
-      <div style="text-align:right">
-        <div style="color:var(--muted);font-size:12px">just now</div>
-        <div class="progress"><span style="width:${occPct}%"></span></div>
-      </div>
     `;
-    detail.appendChild(item);
   }
 }
+
 
 renderHome();
 setInterval(renderHome, 3000);
