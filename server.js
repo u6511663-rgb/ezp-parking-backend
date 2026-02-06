@@ -32,15 +32,18 @@ app.get("/api/buildings", async (req, res) => {
 // =======================
 // GET FLOORS IN BUILDING
 // =======================
-app.get("/api/buildings/:id/floors", async (req, res) => {
+app.get("/api/buildings", async (req, res) => {
   const { data, error } = await supabase
-    .from("floors")
-    .select("*")
-    .eq("building_id", req.params.id);
+    .from("buildings")
+    .select("*");
 
-  if (error) return res.status(500).json(error);
+  if (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+
   res.json(data);
-});
+});;
 
 // =======================
 // GET SLOTS IN FLOOR
