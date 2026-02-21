@@ -132,6 +132,26 @@ async function renderInsights() {
     console.error("Insights error:", err);
   }
 }
+/* =========================
+   ฺButtom
+========================= */
+  document.getElementById("btnToday").onclick = () => {
+  currentDay = "today";
+  setActive("btnToday");
+  renderInsights();
+};
+
+document.getElementById("btnYesterday").onclick = () => {
+  currentDay = "yesterday";
+  setActive("btnYesterday");
+  renderInsights();
+};
+
+function setActive(id) {
+  document.querySelectorAll(".day-btn")
+    .forEach(b => b.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
 
 /* =========================
    Init
