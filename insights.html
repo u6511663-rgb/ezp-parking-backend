@@ -83,27 +83,65 @@ async function loadStatus(id){
 }
 
 async function renderInsights(){
-  const buildings = await loadBuildings();
 
-  let totalSlots = 0;
-  let totalOcc = 0;
+  const r = await fetch("/api/insights/hourly");
+  const data = await r.json();
 
-  const rows = [];
+  const container = document.getElementById("hourPreview");
+  container.innerHTML = "";
 
-  for(const b of buildings){
-    const stat = await loadStatus(b.id);
-    totalSlots += stat.total;
-    totalOcc += stat.occupied;
+  // หา peak hour
+  const peak = data.reduce((a,b)=> a.count>b.count?a:b);
 
-    const pct = stat.total
-      ? Math.round((stat.occupied / stat.total) * 100)
-      : 0;
+  // หา low hour (best time to park)
+  const best = data
+    .filter(d => d.count > 0)
+    .reduce((a,b)=> a.count<b.count?a:b);
 
-    rows.push({
-      name: b.name,
-      pct
-    });
-  }
+  document.getElementById("bestTime").innerHTML =
+    `Best Time to Park: 
+     <span style="color:var(--accent)">
+       ${String(best.hour).padStart(2,'0')}:00 — 
+       ${String(best.hour+1).padStart(2,'0')}:00
+     </span>`;
+
+  // donut = average load
+  const avg =
+    Math.round(
+      data.reduce((s,d)=>s+d.percent,0) / 24
+    );
+
+  document.getElementById("donut")
+    .style.setProperty("--p",
+      Math.round(360 * avg / 100) + "deg");
+
+  document.getElementById("donutText")
+    .textContent = avg + "%";
+
+  // show 06:00 - 21:00
+  data.slice(6,22).forEach(d => {
+
+    const row = document.createElement("div");
+    row.className = "bar-row";
+
+    row.innerHTML = `
+      <div class="bar-label">
+        ${String(d.hour).padStart(2,'0')}:00
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill"
+             style="width:${d.percent}%"></div>
+      </div>
+      <div style="width:40px;text-align:right;font-size:12px">
+        ${d.percent}%
+      </div>
+    `;
+
+    container.appendChild(row);
+  });
+
+}
+
 
   // ===== DONUT =====
   const zonePct = totalSlots
