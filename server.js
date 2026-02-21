@@ -166,6 +166,34 @@ app.get("/debug/supabase", async (req, res) => {
     error
   });
 });
+// =======================
+// INSIGHTS - Historical hourly pattern
+// =======================
+app.get("/api/insights/hourly", async (req, res) => {
+
+  const { data, error } = await supabase
+    .from("parking_history")
+    .select("time");
+
+  if (error) return res.status(500).json(error);
+
+  const hours = Array(24).fill(0);
+
+  data.forEach(row => {
+    const h = new Date(row.time).getHours();
+    hours[h]++;
+  });
+
+  const max = Math.max(...hours) || 1;
+
+  const result = hours.map((count, hour) => ({
+    hour,
+    count,
+    percent: Math.round((count / max) * 100)
+  }));
+
+  res.json(result);
+});
 
 /* ============================
    START SERVER
