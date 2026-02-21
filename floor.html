@@ -387,12 +387,22 @@ async function getFloorByCode(code){
 
   return data[0];
 }
+  async function getAllFloors(){
+  const res = await fetch(API + "/floors");
+  return await res.json();
+}
 async function renderLayout(level){
   const currentLevel = (level || "GND").toUpperCase();
 
-  // 🔥 โหลด floor จาก code แทนการ hardcode id
-  const floor = await getFloorByCode(currentLevel);
+  
+  const floors = await getAllFloors();
+
+  const floor = floors.find(f => 
+    f.code && f.code.toUpperCase() === currentLevel
+  );
+
   if(!floor){
+    console.error("Floor not found:", currentLevel);
     document.getElementById("counts").textContent = "Floor not found";
     return;
   }
@@ -439,14 +449,8 @@ async function renderLayout(level){
         const cell = document.createElement("div");
         cell.className = "slot-cell";
 
-        if(code){
-          if(SLOT_MAP[code]){
-            cell.appendChild(createSlotEl(SLOT_MAP[code]));
-          }
-          else{
-            // 🔥 debug ช่องที่ไม่มีใน DB
-            console.warn("Missing slot in DB:", code);
-          }
+        if(code && SLOT_MAP[code]){
+          cell.appendChild(createSlotEl(SLOT_MAP[code]));
         }
 
         row.appendChild(cell);
