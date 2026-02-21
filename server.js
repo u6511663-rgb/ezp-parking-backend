@@ -173,7 +173,7 @@ app.get("/api/insights/hourly", async (req, res) => {
 
   const { data, error } = await supabase
     .from("parking_history")
-    .select("created_at");
+    .select("created_at");   // 👈 เปลี่ยนตรงนี้ให้ตรงกับ column จริง
 
   if (error) return res.status(500).json(error);
 
@@ -194,7 +194,6 @@ app.get("/api/insights/hourly", async (req, res) => {
 
   res.json(result);
 });
-
 
 /* ============================
    START SERVER
