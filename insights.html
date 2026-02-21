@@ -70,183 +70,83 @@
 <script>
 const API = "/api";
 
-// Load buildings
-async function loadBuildings(){
-  const r = await fetch(API + "/buildings");
-  return r.json();
-}
-
-// Load building status
-async function loadStatus(id){
-  const r = await fetch(API + "/buildings/" + id + "/status");
-  return r.json();
-}
-
+/* =========================
+   Render Historical Hourly Pattern
+========================= */
 async function renderInsights(){
 
-  const r = await fetch("/api/insights/hourly");
-  const data = await r.json();
+  try {
 
-  const container = document.getElementById("hourPreview");
-  container.innerHTML = "";
+    const r = await fetch(API + "/insights/hourly");
+    const data = await r.json();
 
-  // หา peak hour
-  const peak = data.reduce((a,b)=> a.count>b.count?a:b);
+    if (!Array.isArray(data)) return;
 
-  // หา low hour (best time to park)
-  const best = data
-    .filter(d => d.count > 0)
-    .reduce((a,b)=> a.count<b.count?a:b);
+    const container = document.getElementById("hourPreview");
+    container.innerHTML = "";
 
-  document.getElementById("bestTime").innerHTML =
-    `Best Time to Park: 
-     <span style="color:var(--accent)">
-       ${String(best.hour).padStart(2,'0')}:00 — 
-       ${String(best.hour+1).padStart(2,'0')}:00
-     </span>`;
+    // ===== Best Time (hour with lowest traffic > 0) =====
+    const nonZero = data.filter(d => d.count > 0);
 
-  // donut = average load
-  const avg =
-    Math.round(
-      data.reduce((s,d)=>s+d.percent,0) / 24
+    if (nonZero.length > 0) {
+      const best = nonZero.reduce((a,b)=>
+        a.count < b.count ? a : b
+      );
+
+      document.getElementById("bestTime").innerHTML =
+        `Best Time to Park:
+         <span style="color:var(--accent)">
+           ${String(best.hour).padStart(2,'0')}:00 —
+           ${String(best.hour+1).padStart(2,'0')}:00
+         </span>`;
+    }
+
+    // ===== Average Load for Donut =====
+    const avg = Math.round(
+      data.reduce((sum,d)=> sum + d.percent, 0) / 24
     );
 
-  document.getElementById("donut")
-    .style.setProperty("--p",
-      Math.round(360 * avg / 100) + "deg");
+    document.getElementById("donut")
+      .style.setProperty("--p",
+        Math.round(360 * avg / 100) + "deg");
 
-  document.getElementById("donutText")
-    .textContent = avg + "%";
+    document.getElementById("donutText")
+      .textContent = avg + "%";
 
-  // show 06:00 - 21:00
-  data.slice(6,22).forEach(d => {
+    // ===== Hour Bars (06:00–21:00) =====
+    data.slice(6,22).forEach(d => {
 
-    const row = document.createElement("div");
-    row.className = "bar-row";
+      const row = document.createElement("div");
+      row.className = "bar-row";
 
-    row.innerHTML = `
-      <div class="bar-label">
-        ${String(d.hour).padStart(2,'0')}:00
-      </div>
-      <div class="bar-track">
-        <div class="bar-fill"
-             style="width:${d.percent}%"></div>
-      </div>
-      <div style="width:40px;text-align:right;font-size:12px">
-        ${d.percent}%
-      </div>
-    `;
+      row.innerHTML = `
+        <div class="bar-label">
+          ${String(d.hour).padStart(2,'0')}:00
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill"
+               style="width:${d.percent}%"></div>
+        </div>
+        <div style="width:40px;text-align:right;font-size:12px">
+          ${d.percent}%
+        </div>
+      `;
 
-    container.appendChild(row);
-  });
+      container.appendChild(row);
+    });
 
-}
-
-
-  // ===== DONUT =====
-  const zonePct = totalSlots
-    ? Math.round((totalOcc / totalSlots) * 100)
-    : 0;
-
-  document.getElementById("donut")
-    .style.setProperty("--p",
-      Math.round(360 * zonePct / 100) + "deg");
-
-  document.getElementById("donutText")
-    .textContent = zonePct + "%";
-
-  // ===== BEST TIME (Lowest occupancy building) =====
-  const best = rows.reduce((a,b) => a.pct < b.pct ? a : b);
-
-  document.getElementById("bestTime").innerHTML =
-    `Best Parking Zone: <span style="color:var(--accent)">
-      ${best.name}
-    </span>`;
-
-  // ===== BARS =====
-  const container = document.getElementById("hourPreview");
-  container.innerHTML = "";
-
-  rows.forEach(r => {
-
-    const row = document.createElement("div");
-    row.className = "bar-row";
-
-    row.innerHTML = `
-      <div class="bar-label">${r.name}</div>
-      <div class="bar-track">
-        <div class="bar-fill"
-             style="width:${r.pct}%"></div>
-      </div>
-      <div style="width:40px;text-align:right;font-size:12px">
-        ${r.pct}%
-      </div>
-    `;
-
-    container.appendChild(row);
-  });
-
-  document.querySelectorAll('.nav-btn')
-    .forEach(b =>
-      b.classList.toggle('active',
-        b.dataset.page === 'insights')
-    );
-}
-
-
-  // ---- DONUT ----
-  const zonePct = totalSlots ? Math.round((totalOcc / totalSlots) * 100) : 0;
-  document.getElementById("donut").style.setProperty("--p", Math.round(360 * zonePct / 100) + "deg");
-  document.getElementById("donutText").textContent = zonePct + "%";
-
-  // ---- LIST ----
-  const container = document.getElementById("hourPreview");
-  container.innerHTML = "";
-
-  rows.forEach(r => {
-    const el = document.createElement("div");
-    el.style.display = "flex";
-    el.style.alignItems = "center";
-    el.style.gap = "12px";
-    el.style.marginTop = "10px";
-
-    el.innerHTML = `
-      <div style="width:140px" class="small">${r.name}</div>
-      <div style="flex:1;height:10px;border-radius:8px;background:rgba(255,255,255,0.04);overflow:hidden">
-        <div style="width:${r.pct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2))"></div>
-      </div>
-      <div style="width:44px;text-align:right" class="small">${r.pct}%</div>
-    `;
-
-    container.appendChild(el);
-  });
-
-  // nav highlight
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === 'insights'));
-}
-(function applySavedSettings(){
-  const APPEAR_KEY = "ezp_appearance";
-  const ACCENT_KEY = "ezp_accent";
-
-  const mode = localStorage.getItem(APPEAR_KEY) || "system";
-  const accent = localStorage.getItem(ACCENT_KEY) || "#13b5d3";
-
-  // apply accent
-  document.documentElement.style.setProperty("--accent", accent);
-
-  // apply appearance
-  if(mode === "dark"){
-    document.documentElement.style.colorScheme = "dark";
-  } else if(mode === "light"){
-    document.documentElement.style.colorScheme = "light";
-  } else {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
+  } catch(err) {
+    console.error("Insights error:", err);
   }
-})();
-// initial + auto refresh
-renderInsights();
-setInterval(renderInsights, 5000);
+}
+
+/* =========================
+   Init
+========================= */
+document.addEventListener("DOMContentLoaded", () => {
+  renderInsights();
+  setInterval(renderInsights, 5000);
+});
 </script>
 
 </body>
