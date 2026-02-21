@@ -171,21 +171,25 @@ app.get("/debug/supabase", async (req, res) => {
 // =======================
 app.get("/api/insights/hourly", async (req, res) => {
 
-  // ===== คำนวณ "เมื่อวาน" ตามเวลาไทย =====
-  const now = new Date();
+  const day = req.query.day || "today"; // default today
 
-  // แปลงเป็นเวลาไทย
+  const now = new Date();
   const thailandNow = new Date(
     now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
   );
 
-  // เริ่มต้นเมื่อวาน 00:00 ไทย
-  const start = new Date(thailandNow);
-  start.setDate(start.getDate() - 1);
+  let start = new Date(thailandNow);
+  let end = new Date(thailandNow);
+
+  if (day === "yesterday") {
+    start.setDate(start.getDate() - 1);
+  }
+
+  // 00:00
   start.setHours(0,0,0,0);
 
-  // สิ้นสุดเมื่อวาน 23:59:59 ไทย
-  const end = new Date(start);
+  // 23:59:59
+  end = new Date(start);
   end.setHours(23,59,59,999);
 
   const { data, error } = await supabase
