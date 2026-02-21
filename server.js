@@ -171,20 +171,39 @@ app.get("/debug/supabase", async (req, res) => {
 // =======================
 app.get("/api/insights/hourly", async (req, res) => {
 
+  // ===== คำนวณ "เมื่อวาน" ตามเวลาไทย =====
+  const now = new Date();
+
+  // แปลงเป็นเวลาไทย
+  const thailandNow = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+  );
+
+  // เริ่มต้นเมื่อวาน 00:00 ไทย
+  const start = new Date(thailandNow);
+  start.setDate(start.getDate() - 1);
+  start.setHours(0,0,0,0);
+
+  // สิ้นสุดเมื่อวาน 23:59:59 ไทย
+  const end = new Date(start);
+  end.setHours(23,59,59,999);
+
   const { data, error } = await supabase
     .from("parking_history")
-    .select("time");
+    .select("time")
+    .gte("time", start.toISOString())
+    .lte("time", end.toISOString());
 
   if (error) return res.status(500).json(error);
 
   const hours = Array(24).fill(0);
 
   data.forEach(row => {
-    if (!row.time) return;
-
     const date = new Date(row.time);
-
-    const thailandHour = (date.getUTCHours() + 7) % 24;
+    const thailandHour =
+      new Date(
+        date.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+      ).getHours();
 
     hours[thailandHour]++;
   });
@@ -199,6 +218,7 @@ app.get("/api/insights/hourly", async (req, res) => {
 
   res.json(result);
 });
+
 
 /* ============================
    START SERVER
