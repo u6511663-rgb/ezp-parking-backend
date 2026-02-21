@@ -376,14 +376,28 @@ function createSlotEl(slot){
 }
 
 // ===== RENDER FLOOR =====
+async function getFloorByCode(code){
+  const res = await fetch(API + "/floors?code=" + code);
+  const data = await res.json();
+
+  if(!data || data.length === 0){
+    console.error("Floor not found:", code);
+    return null;
+  }
+
+  return data[0];
+}
 async function renderLayout(level){
-  const buildingId = qs("id"); // from home page click
   const currentLevel = (level || "GND").toUpperCase();
 
-  // ⚠️ CHANGE THIS IF YOUR FLOOR IDs ARE DIFFERENT IN DB
-  const floorId = currentLevel === "UPP" ? 2 : 1;
+  // 🔥 โหลด floor จาก code แทนการ hardcode id
+  const floor = await getFloorByCode(currentLevel);
+  if(!floor){
+    document.getElementById("counts").textContent = "Floor not found";
+    return;
+  }
 
-  const slots = await loadSlots(floorId);
+  const slots = await loadSlots(floor.id);
 
   const SLOT_MAP = {};
   let free = 0;
@@ -425,8 +439,14 @@ async function renderLayout(level){
         const cell = document.createElement("div");
         cell.className = "slot-cell";
 
-        if(code && SLOT_MAP[code]){
-          cell.appendChild(createSlotEl(SLOT_MAP[code]));
+        if(code){
+          if(SLOT_MAP[code]){
+            cell.appendChild(createSlotEl(SLOT_MAP[code]));
+          }
+          else{
+            // 🔥 debug ช่องที่ไม่มีใน DB
+            console.warn("Missing slot in DB:", code);
+          }
         }
 
         row.appendChild(cell);
@@ -436,6 +456,7 @@ async function renderLayout(level){
     }
   });
 }
+
 (function applySavedSettings(){
   const APPEAR_KEY = "ezp_appearance";
   const ACCENT_KEY = "ezp_accent";
