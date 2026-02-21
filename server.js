@@ -124,8 +124,8 @@ app.get("/api/buildings/:id/status", async (req, res) => {
 /* ============================
    UPDATE SLOT STATUS
 ============================ */
-
 app.post("/api/slots/:id/status", async (req, res) => {
+
   const slotId = req.params.id;
   const { status } = req.body;
 
@@ -133,39 +133,39 @@ app.post("/api/slots/:id/status", async (req, res) => {
     return res.status(400).json({ error: "Invalid status" });
   }
 
-  // update slot
-  const { error } = await supabase
+  const now = new Date();
+
+  // 1️⃣ Update slot
+  const { error: slotError } = await supabase
     .from("slots")
-    .update({ status })
+    .update({
+      status,
+      last_update: now
+    })
     .eq("id", slotId);
 
-  if (error) {
-    console.error("Update error:", error);
-    return res.status(500).json({ error: error.message });
+  if (slotError) {
+    return res.status(500).json(slotError);
   }
 
-  // save history
+  // 2️⃣ Insert history using SAME timestamp
   const action = status === "occupied" ? "enter" : "exit";
 
-  await supabase
+  const { error: historyError } = await supabase
     .from("parking_history")
-    .insert([{ slot_id: slotId, action }]);
+    .insert([{
+      slot_id: slotId,
+      action,
+      time: now
+    }]);
+
+  if (historyError) {
+    return res.status(500).json(historyError);
+  }
 
   res.json({ success: true });
 });
 
-app.get("/debug/supabase", async (req, res) => {
-  const { data, error } = await supabase
-    .from("slots")
-    .select("id")
-    .limit(1);
-
-  res.json({
-    supabaseUrl: supabaseUrl,
-    hasData: data?.length > 0,
-    error
-  });
-});
 // =======================
 // INSIGHTS - Historical hourly pattern
 // =======================
