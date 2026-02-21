@@ -280,4 +280,74 @@ h1{margin:0;font-size:26px}
   --accent-2: #13b5d3;
   --danger: #e53935;
 }
+.insights-card{
+  display:flex;
+  gap:32px;
+  align-items:flex-start;
+  padding:24px;
+}
+
+.insight-left{
+  width:220px;
+  text-align:center;
+}
+
+.donut{
+  width:160px;
+  height:160px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:conic-gradient(var(--accent) var(--p), rgba(255,255,255,0.06) 0);
+}
+
+.donut-inner{
+  width:100px;
+  height:100px;
+  border-radius:50%;
+  background:var(--panel);
+  display:grid;
+  place-items:center;
+  font-weight:800;
+  font-size:20px;
+}
+
+.insight-right{
+  flex:1;
+}
+
+.best-time{
+  font-weight:700;
+  font-size:15px;
+}
+
+.bars{
+  margin-top:12px;
+}
+
+.bar-row{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-top:10px;
+}
+
+.bar-label{
+  width:120px;
+  font-size:12px;
+  opacity:.7;
+}
+
+.bar-track{
+  flex:1;
+  height:10px;
+  background:rgba(255,255,255,0.05);
+  border-radius:8px;
+  overflow:hidden;
+}
+
+.bar-fill{
+  height:100%;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+}
 
