@@ -284,19 +284,20 @@
 </div>
 
 <div class="wrap">
+<div class="header">
+  <button class="back-btn" id="btnBack">←</button>
 
-  <div class="header">
-    <button class="back-btn" id="btnBack">←</button>
-    <div class="home.html">
-      <div class="title" id="pageTitle">Floor</div>
-      <div class="subtitle" id="pageSub">—</div>
-      <div class="tabs">
-        <button class="floor-tab active" data-level="GND">Ground</button>
-        <button class="floor-tab" data-level="UPP">Upper deck</button>
-      </div>
+  <div class="header-main">
+    <div class="title" id="pageTitle">Floor</div>
+    <div class="subtitle" id="pageSub">—</div>
+    <div class="tabs">
+      <button class="floor-tab active" data-level="GND">Ground</button>
+      <button class="floor-tab" data-level="UPP">Upper deck</button>
     </div>
-    <div class="meta" id="counts">Free 0 • Occ 0</div>
   </div>
+
+  <div class="meta" id="counts">Free 0 • Occ 0</div>
+</div>
 
   <div class="panel">
     <div class="legend-row">
@@ -482,7 +483,24 @@ document.querySelectorAll(".floor-tab").forEach(btn=>{
     renderLayout(btn.dataset.level);
   };
 });
+/* =========================
+   BACK BUTTON
+========================= */
+function setupBackButton() {
+  const backBtn = document.getElementById("btnBack");
+  if (!backBtn) return;
 
+  backBtn.addEventListener("click", () => {
+
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    window.location.href = "/";
+    // window.location.href = "home.html";
+  });
+}
 /* =========================
    INIT
 ========================= */
