@@ -64,7 +64,7 @@ async function renderInsights() {
 
     const r = await fetch(`/api/insights/hourly?day=${currentDay}`);
     const data = await r.json();
-
+    
     if (!Array.isArray(data)) return;
 
     const container = document.getElementById("hourPreview");
@@ -87,6 +87,14 @@ async function renderInsights() {
     }
 
     // ===== Donut =====
+    const { data: slots } = await supabase
+  .from("slots")
+  .select("status");
+
+const total = slots.length;
+const occupied = slots.filter(s => s.status === "occupied").length;
+const percent = Math.round((occupied / total) * 100);
+
     const avg = Math.round(
       data.reduce((sum,d)=> sum + d.percent, 0) / 24
     );
@@ -99,6 +107,7 @@ async function renderInsights() {
       .textContent = avg + "%";
 
     // ===== Bars =====
+    
     data.slice(6,22).forEach(d => {
 
       const row = document.createElement("div");
