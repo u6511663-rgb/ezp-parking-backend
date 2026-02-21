@@ -173,19 +173,21 @@ app.get("/api/insights/hourly", async (req, res) => {
 
   const { data, error } = await supabase
     .from("parking_history")
-    .select("time"); 
+    .select("time");
 
   if (error) return res.status(500).json(error);
 
   const hours = Array(24).fill(0);
 
   data.forEach(row => {
-    const h = new Date(row.time).getHours();
-    hours[h]++;
+    if (!row.time) return;
+
+    const date = new Date(row.time);
+
+    const thailandHour = (date.getUTCHours() + 7) % 24;
+
+    hours[thailandHour]++;
   });
-const date = new Date(row.time);
-const thailandHour = (date.getUTCHours() + 7) % 24;
-hours[thailandHour]++;
 
   const max = Math.max(...hours) || 1;
 
@@ -197,7 +199,6 @@ hours[thailandHour]++;
 
   res.json(result);
 });
-;
 
 /* ============================
    START SERVER
