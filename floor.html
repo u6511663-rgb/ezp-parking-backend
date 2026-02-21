@@ -484,23 +484,38 @@ document.querySelectorAll(".floor-tab").forEach(btn=>{
   };
 });
 /* =========================
-   BACK BUTTON
+   TAB SWITCHING
 ========================= */
-function setupBackButton() {
-  const backBtn = document.getElementById("btnBack");
-  if (!backBtn) return;
+document.querySelectorAll(".floor-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".floor-tab")
+      .forEach(b => b.classList.remove("active"));
 
-  backBtn.addEventListener("click", () => {
-
-    if (window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-
-    window.location.href = "/";
-    // window.location.href = "home.html";
+    btn.classList.add("active");
+    renderLayout(btn.dataset.level);
   });
-}
+});
+
+/* =========================
+   INIT 
+========================= */
+document.addEventListener("DOMContentLoaded", () => {
+
+  // Back button
+  const backBtn = document.getElementById("btnBack");
+  if (backBtn) {
+    backBtn.addEventListener("click", () => {
+
+      // ถ้ามีหน้าก่อนหน้า
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "/";
+        // window.location.href = "home.html";
+      }
+    });
+  }
+
 /* =========================
    INIT
 ========================= */
