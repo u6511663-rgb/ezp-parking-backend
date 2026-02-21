@@ -66,12 +66,12 @@ const API = "/api";
 /* =========================
    Render Historical Hourly Pattern
 ========================= */
-async function renderInsights(){
+let currentDay = "today";
 
-  try {
+async function renderInsights() {
 
-    const r = await fetch(API + "/insights/hourly");
-    const data = await r.json();
+  const r = await fetch(`/api/insights/hourly?day=${currentDay}`);
+  const data = await r.json();
 
     if (!Array.isArray(data)) return;
 
