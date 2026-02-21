@@ -183,6 +183,9 @@ app.get("/api/insights/hourly", async (req, res) => {
     const h = new Date(row.time).getHours();
     hours[h]++;
   });
+const date = new Date(row.time);
+const thailandHour = (date.getUTCHours() + 7) % 24;
+hours[thailandHour]++;
 
   const max = Math.max(...hours) || 1;
 
