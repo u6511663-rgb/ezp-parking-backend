@@ -223,6 +223,23 @@ app.get("/api/insights/hourly", async (req, res) => {
   res.json(result);
 });
 
+app.get("/api/zone/status", async (req, res) => {
+
+  const { data, error } = await supabase
+    .from("slots")
+    .select("status");
+
+  if (error) return res.status(500).json(error);
+
+  const total = data.length;
+  const occupied = data.filter(s => s.status === "occupied").length;
+
+  res.json({
+    total,
+    occupied,
+    percent: total ? Math.round((occupied/total)*100) : 0
+  });
+});
 
 /* ============================
    START SERVER
