@@ -49,7 +49,29 @@ app.get("/api/buildings", async (req, res) => {
 
   res.json(data);
 });
+// =======================
+// GET FLOOR BY CODE
+// =======================
+app.get("/api/floors", async (req, res) => {
+  const { code } = req.query;
 
+  if (!code) {
+    return res.status(400).json({ error: "Missing floor code" });
+  }
+
+  const { data, error } = await supabase
+    .from("floors")
+    .select("*")
+    .eq("code", code)
+    .single();
+
+  if (error) {
+    console.error(error);
+    return res.status(500).json(error);
+  }
+
+  res.json(data);
+});
 /* ============================
    GET SLOTS IN FLOOR
 ============================ */
