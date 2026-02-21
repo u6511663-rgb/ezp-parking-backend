@@ -282,7 +282,7 @@ h1{margin:0;font-size:26px}
 }
 .insights-card{
   display:flex;
-  gap:32px;
+  gap:40px;
   align-items:flex-start;
   padding:24px;
 }
@@ -316,11 +316,6 @@ h1{margin:0;font-size:26px}
   flex:1;
 }
 
-.best-time{
-  font-weight:700;
-  font-size:15px;
-}
-
 .bars{
   margin-top:12px;
 }
@@ -329,12 +324,12 @@ h1{margin:0;font-size:26px}
   display:flex;
   align-items:center;
   gap:14px;
-  margin-top:10px;
+  margin-bottom:10px;
 }
 
 .bar-label{
-  width:120px;
-  font-size:12px;
+  width:60px;
+  font-size:13px;
   opacity:.7;
 }
 
@@ -349,5 +344,7 @@ h1{margin:0;font-size:26px}
 .bar-fill{
   height:100%;
   background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  border-radius:8px;
+  transition:width .4s ease;
 }
 
