@@ -347,4 +347,23 @@ h1{margin:0;font-size:26px}
   border-radius:8px;
   transition:width .4s ease;
 }
+.day-switch {
+  display:flex;
+  gap:10px;
+  margin-bottom:16px;
+}
+
+.day-btn {
+  padding:6px 14px;
+  border-radius:999px;
+  border:1px solid var(--panel-border);
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+}
+
+.day-btn.active {
+  background:var(--panel);
+  color:var(--accent);
+}
 
