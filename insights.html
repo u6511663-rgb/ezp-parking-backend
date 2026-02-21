@@ -87,24 +87,16 @@ async function renderInsights() {
     }
 
     // ===== Donut =====
-    const { data: slots } = await supabase
-  .from("slots")
-  .select("status");
+    // ===== Donut (Realtime) =====
+const zoneRes = await fetch("/api/zone/status");
+const zone = await zoneRes.json();
 
-const total = slots.length;
-const occupied = slots.filter(s => s.status === "occupied").length;
-const percent = Math.round((occupied / total) * 100);
+document.getElementById("donut")
+  .style.setProperty("--p",
+    Math.round(360 * zone.percent / 100) + "deg");
 
-    const avg = Math.round(
-      data.reduce((sum,d)=> sum + d.percent, 0) / 24
-    );
-
-    document.getElementById("donut")
-      .style.setProperty("--p",
-        Math.round(360 * avg / 100) + "deg");
-
-    document.getElementById("donutText")
-      .textContent = avg + "%";
+document.getElementById("donutText")
+  .textContent = zone.percent + "%";
 
     // ===== Bars =====
     
