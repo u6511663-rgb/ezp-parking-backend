@@ -497,41 +497,42 @@ document.querySelectorAll(".floor-tab").forEach(btn => {
 });
 
 /* =========================
-   INIT 
+   INIT (after DOM ready)
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
 
-  // Back button
+  // TAB SWITCHING
+  document.querySelectorAll(".floor-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".floor-tab")
+        .forEach(b => b.classList.remove("active"));
+
+      btn.classList.add("active");
+      renderLayout(btn.dataset.level);
+    });
+  });
+
+  // BACK BUTTON
   const backBtn = document.getElementById("btnBack");
   if (backBtn) {
     backBtn.addEventListener("click", () => {
-
-      // ถ้ามีหน้าก่อนหน้า
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.href = "/";
-        // window.location.href = "home.html";
-      }
+      window.location.href = "/";
     });
   }
 
-/* =========================
-   INIT
-========================= */
-renderLayout("GND");
+  // LOAD DEFAULT FLOOR
+  renderLayout("GND");
 
-/* =========================
-   AUTO REFRESH (3s)
-========================= */
-setInterval(()=>{
-  const active =
-    document.querySelector(".floor-tab.active")
-      ?.dataset.level || "GND";
+  // AUTO REFRESH
+  setInterval(() => {
+    const active =
+      document.querySelector(".floor-tab.active")
+        ?.dataset.level || "GND";
 
-  renderLayout(active);
-}, 3000);
+    renderLayout(active);
+  }, 3000);
 
+});
 </script>
 </body>
 </html>
