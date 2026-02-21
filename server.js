@@ -132,6 +132,19 @@ app.post("/api/slots/:id/status", async (req, res) => {
   res.json({ success: true });
 });
 
+app.get("/debug/supabase", async (req, res) => {
+  const { data, error } = await supabase
+    .from("slots")
+    .select("id")
+    .limit(1);
+
+  res.json({
+    supabaseUrl: supabaseUrl,
+    hasData: data?.length > 0,
+    error
+  });
+});
+
 /* ============================
    START SERVER
 ============================ */
