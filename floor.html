@@ -332,29 +332,75 @@
 <script>
 const API = "/api";
 
-// map level → floorId ตรงกับ database จริง
+/* =========================
+   FLOOR ID MAP (DB mapping)
+========================= */
 const FLOOR_ID_MAP = {
   GND: 1,
   UPP: 2
 };
 
+/* =========================
+   VISUAL LAYOUT DEFINITION
+========================= */
+const FLOOR_LAYOUT = {
+  GND: {
+    rows: [
+      ['G01','G02','G03','G04','G05','G06','G07','G08','G09','G10'],
+      'lane-small',
+      ['G11','G12','G13','G14','G15','G16','G17','G18','G19','G20'],
+      'lane-main',
+      ['G21','G22','G23','G24','G25','G26','G27','G28','G29','G30'],
+      'lane-small',
+      ['G31','G32','G33','G34','G35','G36','G37','G38','G39','G40']
+    ]
+  },
+  UPP: {
+    rows: [
+      ['U01','U02','U03','U04','U05','U06','U07','U08','U09', null],
+      'lane-small',
+      ['U10','U11','U12','U13','U14','U15','U16','U17','U18', null],
+      'lane-main',
+      [null,'U19','U20','U21','U22', null, null, null, null, null]
+    ]
+  }
+};
+
+/* =========================
+   API CALL
+========================= */
 async function loadSlots(floorId){
   try{
-    const res = await fetch(API + "/floors/" + floorId + "/slots");
-    if(!res.ok) throw new Error("Slots API failed");
+    const res = await fetch(`${API}/floors/${floorId}/slots`);
+    if(!res.ok) throw new Error("Failed to load slots");
     return await res.json();
   }catch(err){
-    console.error(err);
+    console.error("API error:", err);
     return [];
   }
 }
 
-function padSlotCode(code){
-  return code.replace(/(\D)(\d+)/, (_,p1,p2)=>{
-    return p1 + p2.padStart(2,'0');
-  });
+/* =========================
+   SLOT UI CREATION
+========================= */
+function createSlotEl(slot){
+  const el = document.createElement("div");
+
+  el.className =
+    "slot-tile " +
+    (slot.status === "free" ? "free" : "occupied");
+
+  el.innerHTML = `
+    <div class="slot-code">${slot.code}</div>
+    <div class="slot-car">🚗</div>
+  `;
+
+  return el;
 }
 
+/* =========================
+   RENDER FLOOR
+========================= */
 async function renderLayout(level){
 
   const currentLevel = (level || "GND").toUpperCase();
@@ -372,8 +418,7 @@ async function renderLayout(level){
   let free = 0;
 
   slots.forEach(s=>{
-    const padded = padSlotCode(s.code);
-    SLOT_MAP[padded] = s;
+    SLOT_MAP[s.code] = s;
     if(s.status === "free") free++;
   });
 
@@ -425,7 +470,9 @@ async function renderLayout(level){
   });
 }
 
-// UI
+/* =========================
+   TAB SWITCHING
+========================= */
 document.querySelectorAll(".floor-tab").forEach(btn=>{
   btn.onclick = ()=>{
     document.querySelectorAll(".floor-tab")
@@ -436,18 +483,22 @@ document.querySelectorAll(".floor-tab").forEach(btn=>{
   };
 });
 
+/* =========================
+   INIT
+========================= */
 renderLayout("GND");
 
+/* =========================
+   AUTO REFRESH (3s)
+========================= */
 setInterval(()=>{
-  const lvl =
+  const active =
     document.querySelector(".floor-tab.active")
       ?.dataset.level || "GND";
 
-  renderLayout(lvl);
+  renderLayout(active);
 }, 3000);
 
 </script>
-
-
 </body>
 </html>
