@@ -332,103 +332,48 @@
 <script>
 const API = "/api";
 
-/* ===============================
-   HELPERS
-================================= */
+// map level → floorId ตรงกับ database จริง
+const FLOOR_ID_MAP = {
+  GND: 1,
+  UPP: 2
+};
 
-// normalize level
-function normalizeLevel(level){
-  const MAP = {
-    GND: "GND",
-    GROUND: "GND",
-    "GROUND LEVEL": "GND",
-    UPP: "UPP",
-    UPPER: "UPP",
-    "UPPER DECK": "UPP"
-  };
-  return MAP[(level || "GND").toUpperCase().trim()] || "GND";
+async function loadSlots(floorId){
+  try{
+    const res = await fetch(API + "/floors/" + floorId + "/slots");
+    if(!res.ok) throw new Error("Slots API failed");
+    return await res.json();
+  }catch(err){
+    console.error(err);
+    return [];
+  }
 }
 
-// pad slot code (G1 → G01)
 function padSlotCode(code){
   return code.replace(/(\D)(\d+)/, (_,p1,p2)=>{
     return p1 + p2.padStart(2,'0');
   });
 }
 
-// show message in layout
-function showMessage(msg){
-  const layout = document.getElementById("parkingLayout");
-  layout.innerHTML = `
-    <div style="padding:20px;text-align:center;color:#ff6b6b;">
-      ${msg}
-    </div>
-  `;
-}
-
-/* ===============================
-   API CALLS
-================================= */
-
-async function getAllFloors(){
-  try{
-    const res = await fetch(API + "/floors");
-    if(!res.ok) throw new Error("floors API failed");
-    return await res.json();
-  }catch(err){
-    console.error(err);
-    return [];
-  }
-}
-
-async function loadSlots(floorId){
-  try{
-    const res = await fetch(API + "/floors/" + floorId + "/slots");
-    if(!res.ok) throw new Error("slots API failed");
-    return await res.json();
-  }catch(err){
-    console.error(err);
-    return [];
-  }
-}
-
-/* ===============================
-   RENDER
-================================= */
-
 async function renderLayout(level){
 
-  const currentLevel = normalizeLevel(level);
+  const currentLevel = (level || "GND").toUpperCase();
+  const floorId = FLOOR_ID_MAP[currentLevel];
 
-  console.log("Rendering level:", currentLevel);
-
-  showMessage("Loading...");
-
-  // 1️⃣ load floors
-  const floors = await getAllFloors();
-  if(!floors.length){
-    showMessage("No floors found");
+  if(!floorId){
+    document.getElementById("parkingLayout").innerHTML =
+      "<div style='color:red;padding:20px'>Invalid floor</div>";
     return;
   }
 
-  const floor = floors.find(f =>
-    f.code && f.code.toUpperCase() === currentLevel
-  );
-
-  if(!floor){
-    showMessage("Floor not found in database");
-    return;
-  }
-
-  // 2️⃣ load slots
-  const slots = await loadSlots(floor.id);
+  const slots = await loadSlots(floorId);
 
   const SLOT_MAP = {};
   let free = 0;
 
   slots.forEach(s=>{
-    const paddedCode = padSlotCode(s.code);
-    SLOT_MAP[paddedCode] = s;
+    const padded = padSlotCode(s.code);
+    SLOT_MAP[padded] = s;
     if(s.status === "free") free++;
   });
 
@@ -442,12 +387,6 @@ async function renderLayout(level){
     currentLevel === "UPP" ? "Upper Deck" : "Ground Level";
 
   const layoutDef = FLOOR_LAYOUT[currentLevel];
-
-  if(!layoutDef){
-    showMessage("Layout definition missing");
-    return;
-  }
-
   const layout = document.getElementById("parkingLayout");
   layout.innerHTML = "";
 
@@ -486,27 +425,16 @@ async function renderLayout(level){
   });
 }
 
-/* ===============================
-   UI EVENTS
-================================= */
-
-document.getElementById("btnBack").onclick =
-  ()=> location="home.html";
-
+// UI
 document.querySelectorAll(".floor-tab").forEach(btn=>{
   btn.onclick = ()=>{
     document.querySelectorAll(".floor-tab")
       .forEach(b=>b.classList.remove("active"));
 
     btn.classList.add("active");
-
     renderLayout(btn.dataset.level);
   };
 });
-
-/* ===============================
-   INIT
-================================= */
 
 renderLayout("GND");
 
