@@ -122,7 +122,7 @@ async function renderAlerts(){
 }
 
 /* =========================
-   ADD ALERT (Better UX)
+   ADD ALERT
 ========================= */
 document.getElementById("addAlert")
   .addEventListener("click", async ()=>{
@@ -145,7 +145,22 @@ document.getElementById("addAlert")
     }
 
   });
+async function sendNotification(alert, slotId) {
 
+  const message = `Slot ${slotId} is now FREE`;
+
+  console.log("🔔 Sending notification:", message);
+
+  // Insert log
+  await supabase
+    .from("notifications_log")
+    .insert([{
+      alert_id: alert.id,
+      slot_id: slotId,
+      message,
+      success: true
+    }]);
+}
 /* =========================
    INIT
 ========================= */
