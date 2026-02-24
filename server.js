@@ -5,13 +5,17 @@ const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 
+/* ==============================
+   MIDDLEWARE
+============================== */
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-/* =============================
-   SUPABASE
-============================= */
+/* ==============================
+   SUPABASE INIT
+============================== */
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
   console.error("❌ Missing Supabase ENV");
@@ -25,140 +29,137 @@ const supabase = createClient(
 
 console.log("🔗 Supabase connected");
 
-/* =============================
+/* ==============================
+   UTIL
+============================== */
+
+function getDayRange(day = "today") {
+  const now = new Date();
+  const thailand = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+  );
+
+  if (day === "yesterday") {
+    thailand.setDate(thailand.getDate() - 1);
+  }
+
+  thailand.setHours(0, 0, 0, 0);
+
+  const start = new Date(thailand);
+  const end = new Date(thailand);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
+}
+
+/* ==============================
+   HEALTH CHECK
+============================== */
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+/* ==============================
    ROOT
-============================= */
+============================== */
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "home.html"));
 });
 
-/* =============================
-   GET BUILDINGS
-============================= */
+/* ==============================
+   BUILDINGS
+============================== */
 
-app.get("/api/buildings", async (req, res) => {
+app.get("/api/buildings", async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from("buildings")
+      .select("*");
 
-  const { data, error } = await supabase
-    .from("buildings")
-    .select("*");
+    if (error) throw error;
 
-  if (error) return res.status(500).json(error);
-
-  res.json(data);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
 });
 
-/* =============================
-   GET SLOTS IN FLOOR
-============================= */
+/* ==============================
+   FLOOR SLOTS
+============================== */
 
-app.get("/api/floors/:id/slots", async (req, res) => {
+app.get("/api/floors/:id/slots", async (req, res, next) => {
+  try {
+    const floorId = parseInt(req.params.id);
 
-  const floorId = parseInt(req.params.id);
+    const { data, error } = await supabase
+      .from("slots")
+      .select("*")
+      .eq("floor_id", floorId)
+      .order("code");
 
-  const { data, error } = await supabase
-    .from("slots")
-    .select("*")
-    .eq("floor_id", floorId)
-    .order("code");
+    if (error) throw error;
 
-  if (error) return res.status(500).json(error);
-
-  res.json(data);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
 });
 
-/* =============================
+/* ==============================
    UPDATE SLOT STATUS
-============================= */
+============================== */
 
-app.post("/api/slots/:id/status", async (req, res) => {
+app.post("/api/slots/:id/status", async (req, res, next) => {
+  try {
+    const slotId = parseInt(req.params.id);
+    const { status } = req.body;
 
-  const slotId = req.params.id;
-  const { status } = req.body;   // ✅ ต้องมีบรรทัดนี้
+    if (!["free", "occupied"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
 
-  if (!status) {
-    return res.status(400).json({ error: "Missing status" });
-  }
+    const now = new Date();
 
-  if (!["free", "occupied"].includes(status)) {
-    return res.status(400).json({ error: "Invalid status" });
-  }
+    // update slot
+    const { error: updateError } = await supabase
+      .from("slots")
+      .update({
+        status,
+        last_update: now
+      })
+      .eq("id", slotId);
 
-  const now = new Date();
+    if (updateError) throw updateError;
 
-  // update slot
-  const { error: slotError } = await supabase
-    .from("slots")
-    .update({
-      status,
-      last_update: now
-    })
-    .eq("id", slotId);
+    // log event
+    const action = status === "occupied" ? "enter" : "exit";
 
-  if (slotError) {
-    return res.status(500).json(slotError);
-  }
-
-  // insert history
-  const action = status === "occupied" ? "enter" : "exit";
-
-  await supabase
-    .from("parking_history")
-    .insert([{
+    await supabase.from("parking_events").insert([{
       slot_id: slotId,
       action,
-      time: now
+      created_at: now
     }]);
 
-  res.json({ success: true });
-});
-/* =============================
-   REALTIME ZONE STATUS
-============================= */
+    // 🔔 ALERT TRIGGER
+    if (status === "free") {
+      await triggerAlerts(slotId);
+    }
 
-app.get("/api/zone/status", async (req, res) => {
+    res.json({ success: true });
 
-  const { data, error } = await supabase
-    .from("slots")
-    .select("status");
-
-  if (error) return res.status(500).json(error);
-
-  const total = data.length;
-  const occupied = data.filter(s => s.status === "occupied").length;
-
-  res.json({
-    total,
-    occupied,
-    percent: total ? Math.round((occupied/total)*100) : 0
-  });
+  } catch (err) {
+    next(err);
+  }
 });
 
-/* =============================
-   HOURLY INSIGHT (Traffic)
-============================= */
+/* ==============================
+   ALERT TRIGGER ENGINE
+============================== */
 
-app.get("/api/insights/hourly", async (req, res) => {
-
-  const day = req.query.day || "today";
-
-  const now = new Date();
-  const start = new Date(now);
-  if (day === "yesterday")
-    start.setDate(start.getDate()-1);
-
-  start.setHours(0,0,0,0);
-
-  const end = new Date(start);
-  end.setHours(23,59,59,999);
-
-  const { data, error } = await supabase
-    .from("parking_events")
-    .select("created_at, action")
-    .gte("created_at", start.toISOString())
-    .lte("created_at", end.toISOString());
-
-if (status === "free") {
+async function triggerAlerts(slotId) {
 
   const { data: alerts } = await supabase
     .from("alerts")
@@ -166,92 +167,160 @@ if (status === "free") {
     .eq("slot_id", slotId)
     .eq("enabled", true);
 
+  if (!alerts || alerts.length === 0) return;
+
   for (const alert of alerts) {
-    await sendNotification(alert, slotId);
+
+    // mock notification (replace with real push/email later)
+    console.log(`🔔 Alert triggered for slot ${slotId}`);
+
+    await supabase.from("notifications_log").insert([{
+      alert_id: alert.id,
+      slot_id: slotId,
+      sent_at: new Date()
+    }]);
   }
 }
-  if (error) return res.status(500).json(error);
 
-  const hours = Array(24).fill(0);
+/* ==============================
+   REALTIME ZONE STATUS
+============================== */
 
-  data.forEach(e=>{
-    if (e.action !== "enter") return;
-    const h = new Date(e.created_at).getHours();
-    hours[h]++;
-  });
+app.get("/api/zone/status", async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from("slots")
+      .select("status");
 
-  const max = Math.max(...hours) || 1;
+    if (error) throw error;
 
-  res.json(
-    hours.map((count,h)=>({
-      hour:h,
-      count,
-      percent:Math.round((count/max)*100)
-    }))
-  );
+    const total = data.length;
+    const occupied = data.filter(s => s.status === "occupied").length;
+
+    res.json({
+      total,
+      occupied,
+      percent: total ? Math.round((occupied / total) * 100) : 0
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
-/* =============================
-   WEEKLY TREND
-============================= */
+/* ==============================
+   HOURLY INSIGHTS
+============================== */
 
-app.get("/api/insights/weekly", async (req,res)=>{
+app.get("/api/insights/hourly", async (req, res, next) => {
+  try {
+    const day = req.query.day || "today";
+    const { start, end } = getDayRange(day);
 
-  const result = [];
-
-  for(let i=6;i>=0;i--){
-
-    const start = new Date();
-    start.setDate(start.getDate()-i);
-    start.setHours(0,0,0,0);
-
-    const end = new Date(start);
-    end.setHours(23,59,59,999);
-
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("parking_events")
-      .select("id")
+      .select("created_at, action")
       .gte("created_at", start.toISOString())
       .lte("created_at", end.toISOString());
 
-    result.push({
-      date:start.toISOString().slice(0,10),
-      traffic:data.length
+    if (error) throw error;
+
+    const hours = Array(24).fill(0);
+
+    data.forEach(e => {
+      if (e.action !== "enter") return;
+      const h = new Date(e.created_at).getHours();
+      hours[h]++;
     });
+
+    const max = Math.max(...hours) || 1;
+
+    res.json(
+      hours.map((count, hour) => ({
+        hour,
+        count,
+        percent: Math.round((count / max) * 100)
+      }))
+    );
+
+  } catch (err) {
+    next(err);
   }
-
-  res.json(result);
 });
 
-/* =============================
-   HEATMAP (Day x Hour)
-============================= */
+/* ==============================
+   WEEKLY TREND
+============================== */
 
-app.get("/api/insights/heatmap", async (req,res)=>{
+app.get("/api/insights/weekly", async (req, res, next) => {
+  try {
+    const result = [];
 
-  const { data } = await supabase
-    .from("parking_events")
-    .select("created_at");
+    for (let i = 6; i >= 0; i--) {
+      const { start, end } = getDayRange("today");
+      start.setDate(start.getDate() - i);
+      end.setDate(end.getDate() - i);
 
-  const grid = {};
+      const { data } = await supabase
+        .from("parking_events")
+        .select("id")
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString());
 
-  data.forEach(e=>{
-    const d = new Date(e.created_at);
-    const day = d.getDay();
-    const hour = d.getHours();
-    const key = `${day}-${hour}`;
-    grid[key] = (grid[key]||0)+1;
-  });
+      result.push({
+        date: start.toISOString().slice(0, 10),
+        traffic: data.length
+      });
+    }
 
-  res.json(grid);
+    res.json(result);
+
+  } catch (err) {
+    next(err);
+  }
 });
 
-/* =============================
-   SERVER START
-============================= */
+/* ==============================
+   HEATMAP
+============================== */
+
+app.get("/api/insights/heatmap", async (req, res, next) => {
+  try {
+    const { data } = await supabase
+      .from("parking_events")
+      .select("created_at");
+
+    const grid = {};
+
+    data.forEach(e => {
+      const d = new Date(e.created_at);
+      const day = d.getDay();
+      const hour = d.getHours();
+      const key = `${day}-${hour}`;
+      grid[key] = (grid[key] || 0) + 1;
+    });
+
+    res.json(grid);
+
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ==============================
+   GLOBAL ERROR HANDLER
+============================== */
+
+app.use((err, req, res, next) => {
+  console.error("❌ SERVER ERROR:", err.message);
+  res.status(500).json({ error: "Internal Server Error" });
+});
+
+/* ==============================
+   START SERVER
+============================== */
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, ()=>{
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
