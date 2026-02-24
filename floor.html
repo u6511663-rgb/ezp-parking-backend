@@ -368,23 +368,30 @@ const FLOOR_LAYOUT = {
 };
 
 /* =========================
-   API CALL
+   LOAD SLOTS
 ========================= */
 async function loadSlots(floorId){
-  try{
-    const res = await fetch(`${API}/floors/${floorId}/slots`);
-    if(!res.ok) throw new Error("Failed to load slots");
-    return await res.json();
-  }catch(err){
-    console.error("API error:", err);
-    return [];
-  }
+  const res = await fetch(`${API}/floors/${floorId}/slots`);
+  if(!res.ok) return [];
+  return await res.json();
 }
 
 /* =========================
-   SLOT UI CREATION
+   UPDATE SLOT STATUS
+========================= */
+async function updateSlot(slotId, newStatus){
+  await fetch(`${API}/slots/${slotId}/status`,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ status:newStatus })
+  });
+}
+
+/* =========================
+   CREATE SLOT TILE
 ========================= */
 function createSlotEl(slot){
+
   const el = document.createElement("div");
 
   el.className =
@@ -396,6 +403,23 @@ function createSlotEl(slot){
     <div class="slot-car">🚗</div>
   `;
 
+  /* ===== TOGGLE STATUS ===== */
+  el.addEventListener("click", async ()=>{
+
+    const newStatus =
+      slot.status === "free"
+      ? "occupied"
+      : "free";
+
+    // Optimistic UI
+    el.classList.remove("free","occupied");
+    el.classList.add(newStatus);
+
+    slot.status = newStatus;
+
+    await updateSlot(slot.id, newStatus);
+  });
+
   return el;
 }
 
@@ -404,14 +428,8 @@ function createSlotEl(slot){
 ========================= */
 async function renderLayout(level){
 
-  const currentLevel = (level || "GND").toUpperCase();
-  const floorId = FLOOR_ID_MAP[currentLevel];
-
-  if(!floorId){
-    document.getElementById("parkingLayout").innerHTML =
-      "<div style='color:red;padding:20px'>Invalid floor</div>";
-    return;
-  }
+  const floorId = FLOOR_ID_MAP[level];
+  if(!floorId) return;
 
   const slots = await loadSlots(floorId);
 
@@ -430,9 +448,9 @@ async function renderLayout(level){
     `Free ${free} • Occ ${occ}`;
 
   document.getElementById("pageTitle").textContent =
-    currentLevel === "UPP" ? "Upper Deck" : "Ground Level";
+    level === "UPP" ? "Upper Deck" : "Ground Level";
 
-  const layoutDef = FLOOR_LAYOUT[currentLevel];
+  const layoutDef = FLOOR_LAYOUT[level];
   const layout = document.getElementById("parkingLayout");
   layout.innerHTML = "";
 
@@ -472,65 +490,38 @@ async function renderLayout(level){
 }
 
 /* =========================
-   TAB SWITCHING
+   INIT
 ========================= */
-document.querySelectorAll(".floor-tab").forEach(btn=>{
-  btn.onclick = ()=>{
-    document.querySelectorAll(".floor-tab")
-      .forEach(b=>b.classList.remove("active"));
+document.addEventListener("DOMContentLoaded", ()=>{
 
-    btn.classList.add("active");
-    renderLayout(btn.dataset.level);
-  };
-});
-/* =========================
-   TAB SWITCHING
-========================= */
-document.querySelectorAll(".floor-tab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".floor-tab")
-      .forEach(b => b.classList.remove("active"));
+  // Tab switch
+  document.querySelectorAll(".floor-tab")
+    .forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        document.querySelectorAll(".floor-tab")
+          .forEach(b=>b.classList.remove("active"));
 
-    btn.classList.add("active");
-    renderLayout(btn.dataset.level);
-  });
-});
-
-/* =========================
-   INIT (after DOM ready)
-========================= */
-document.addEventListener("DOMContentLoaded", () => {
-
-  // TAB SWITCHING
-  document.querySelectorAll(".floor-tab").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".floor-tab")
-        .forEach(b => b.classList.remove("active"));
-
-      btn.classList.add("active");
-      renderLayout(btn.dataset.level);
+        btn.classList.add("active");
+        renderLayout(btn.dataset.level);
+      });
     });
-  });
 
-  // BACK BUTTON
-  const backBtn = document.getElementById("btnBack");
-  if (backBtn) {
-    backBtn.addEventListener("click", () => {
+  // Back
+  document.getElementById("btnBack")
+    ?.addEventListener("click", ()=>{
       window.location.href = "/";
     });
-  }
 
-  // LOAD DEFAULT FLOOR
   renderLayout("GND");
 
-  // AUTO REFRESH
-  setInterval(() => {
+  // Auto refresh
+  setInterval(()=>{
     const active =
       document.querySelector(".floor-tab.active")
-        ?.dataset.level || "GND";
+      ?.dataset.level || "GND";
 
     renderLayout(active);
-  }, 3000);
+  },3000);
 
 });
 </script>
