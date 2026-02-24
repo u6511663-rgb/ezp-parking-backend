@@ -85,7 +85,34 @@ app.get("/api/buildings", async (req, res, next) => {
     next(err);
   }
 });
+/* ==============================
+   BUILDING STATUS
+============================== */
 
+app.get("/api/buildings/:id/status", async (req, res, next) => {
+  try {
+    const buildingId = parseInt(req.params.id);
+
+    const { data, error } = await supabase
+      .from("slots")
+      .select("status, floors!inner(building_id)")
+      .eq("floors.building_id", buildingId);
+
+    if (error) throw error;
+
+    const total = data.length;
+    const occupied = data.filter(s => s.status === "occupied").length;
+
+    res.json({
+      total,
+      occupied,
+      free: total - occupied
+    });
+
+  } catch (err) {
+    next(err);
+  }
+});
 /* ==============================
    FLOOR SLOTS
 ============================== */
