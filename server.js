@@ -73,41 +73,45 @@ app.get("/api/floors/:id/slots", async (req, res) => {
 
 app.post("/api/slots/:id/status", async (req, res) => {
 
-  const slotId = parseInt(req.params.id);
-  const { status } = req.body;
+  const slotId = req.params.id;
+  const { status } = req.body;   // ✅ ต้องมีบรรทัดนี้
 
-  if (!["free","occupied"].includes(status))
+  if (!status) {
+    return res.status(400).json({ error: "Missing status" });
+  }
+
+  if (!["free", "occupied"].includes(status)) {
     return res.status(400).json({ error: "Invalid status" });
+  }
 
   const now = new Date();
+
+  // update slot
+  const { error: slotError } = await supabase
+    .from("slots")
+    .update({
+      status,
+      last_update: now
+    })
+    .eq("id", slotId);
+
+  if (slotError) {
+    return res.status(500).json(slotError);
+  }
+
+  // insert history
   const action = status === "occupied" ? "enter" : "exit";
 
-  // 1️⃣ Update current state
-  const { data: updated, error: updateErr } = await supabase
-    .from("slots")
-    .update({ status, last_update: now })
-    .eq("id", slotId)
-    .select();
-
-  if (updateErr) return res.status(500).json(updateErr);
-
-  if (!updated || updated.length === 0)
-    return res.status(404).json({ error: "Slot not found" });
-
-  // 2️⃣ Insert event log
-  const { error: eventErr } = await supabase
-    .from("parking_events")
+  await supabase
+    .from("parking_history")
     .insert([{
       slot_id: slotId,
       action,
-      created_at: now
+      time: now
     }]);
-
-  if (eventErr) return res.status(500).json(eventErr);
 
   res.json({ success: true });
 });
-
 /* =============================
    REALTIME ZONE STATUS
 ============================= */
