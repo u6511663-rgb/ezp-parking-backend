@@ -55,24 +55,21 @@
 
 <script>
 const API = "/api";
+let currentDay = "today";
 
 /* =========================
-   Render Historical Hourly Pattern
+   RENDER INSIGHTS
 ========================= */
 async function renderInsights() {
   try {
 
-    const r = await fetch(`/api/insights/hourly?day=${currentDay}`);
+    /* ===== Hourly Pattern ===== */
+    const r = await fetch(`${API}/insights/hourly?day=${currentDay}`);
     const data = await r.json();
-    
     if (!Array.isArray(data)) return;
 
-    const container = document.getElementById("hourPreview");
-    container.innerHTML = "";
-
-    // ===== Best Time =====
+    /* ===== Best Time ===== */
     const nonZero = data.filter(d => d.count > 0);
-
     if (nonZero.length > 0) {
       const best = nonZero.reduce((a,b)=>
         a.count < b.count ? a : b
@@ -84,22 +81,26 @@ async function renderInsights() {
            ${String(best.hour).padStart(2,'0')}:00 —
            ${String(best.hour+1).padStart(2,'0')}:00
          </span>`;
+    } else {
+      document.getElementById("bestTime").textContent =
+        "No traffic data for this day";
     }
 
-    // ===== Donut =====
-    // ===== Donut (Realtime) =====
-const zoneRes = await fetch("/api/zone/status");
-const zone = await zoneRes.json();
+    /* ===== Donut (Realtime) ===== */
+    const zoneRes = await fetch(`${API}/zone/status`);
+    const zone = await zoneRes.json();
 
-document.getElementById("donut")
-  .style.setProperty("--p",
-    Math.round(360 * zone.percent / 100) + "deg");
+    document.getElementById("donut")
+      .style.setProperty("--p",
+        Math.round(360 * zone.percent / 100) + "deg");
 
-document.getElementById("donutText")
-  .textContent = zone.percent + "%";
+    document.getElementById("donutText")
+      .textContent = zone.percent + "%";
 
-    // ===== Bars =====
-    
+    /* ===== Bars ===== */
+    const container = document.getElementById("hourPreview");
+    container.innerHTML = "";
+
     data.slice(6,22).forEach(d => {
 
       const row = document.createElement("div");
@@ -127,9 +128,9 @@ document.getElementById("donutText")
 }
 
 /* =========================
-   ฺButtom
+   DAY SWITCH
 ========================= */
-  document.getElementById("btnToday").onclick = () => {
+document.getElementById("btnToday").onclick = () => {
   currentDay = "today";
   setActive("btnToday");
   renderInsights();
@@ -148,7 +149,7 @@ function setActive(id) {
 }
 
 /* =========================
-   Init
+   INIT
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
   renderInsights();
