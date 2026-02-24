@@ -35,25 +35,40 @@
 <script>
 const API = "/api";
 
-// Load alerts from backend
+/* =========================
+   LOAD ALERTS
+========================= */
 async function loadAlerts(){
-  const r = await fetch(API + "/alerts");
-  return r.json();
+  try{
+    const r = await fetch(`${API}/alerts`);
+    if(!r.ok) throw new Error("Failed to load alerts");
+    return await r.json();
+  }catch(err){
+    console.error(err);
+    return [];
+  }
 }
 
-// Render alerts
+/* =========================
+   RENDER ALERTS
+========================= */
 async function renderAlerts(){
-  const c = document.getElementById("alertsContainer");
-  const arr = await loadAlerts();
 
-  if(arr.length === 0){
-    c.innerHTML = '<div class="small">No alerts yet — click + to add one.</div>';
+  const container = document.getElementById("alertsContainer");
+  container.innerHTML = "<div class='small'>Loading...</div>";
+
+  const alerts = await loadAlerts();
+
+  if(!alerts.length){
+    container.innerHTML =
+      "<div class='small'>No alerts yet — click + to add one.</div>";
     return;
   }
 
-  c.innerHTML = "";
+  container.innerHTML = "";
 
-  arr.forEach(a => {
+  alerts.forEach(a=>{
+
     const row = document.createElement("div");
     row.className = "alert-item";
 
@@ -74,44 +89,69 @@ async function renderAlerts(){
       </div>
     `;
 
-    c.appendChild(row);
+    container.appendChild(row);
   });
 
-  // Toggle
-  document.querySelectorAll(".toggle").forEach(t => {
-    t.onclick = async () => {
-      await fetch(API + "/alerts/" + t.dataset.id + "/toggle", { method: "PUT" });
-      renderAlerts();
-    };
+  /* ===== TOGGLE ===== */
+  document.querySelectorAll(".toggle").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      try{
+        await fetch(`${API}/alerts/${btn.dataset.id}/toggle`,{
+          method:"PUT"
+        });
+        renderAlerts();
+      }catch(e){
+        console.error("Toggle failed");
+      }
+    });
   });
 
-  // Delete
-  document.querySelectorAll("[data-del]").forEach(b => {
-    b.onclick = async () => {
-      await fetch(API + "/alerts/" + b.dataset.del, { method: "DELETE" });
-      renderAlerts();
-    };
+  /* ===== DELETE ===== */
+  document.querySelectorAll("[data-del]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      try{
+        await fetch(`${API}/alerts/${btn.dataset.del}`,{
+          method:"DELETE"
+        });
+        renderAlerts();
+      }catch(e){
+        console.error("Delete failed");
+      }
+    });
   });
 }
 
-// Add alert
-document.getElementById("addAlert").onclick = async () => {
-  const slotId = prompt("Enter SLOT ID (example: 1, 2, 3...)");
-  if(!slotId) return;
+/* =========================
+   ADD ALERT (Better UX)
+========================= */
+document.getElementById("addAlert")
+  .addEventListener("click", async ()=>{
 
-  await fetch(API + "/alerts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ slot_id: slotId })
+    const slotCode = prompt("Enter SLOT CODE (example: G02)");
+
+    if(!slotCode) return;
+
+    try{
+      await fetch(`${API}/alerts`,{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ slot_code: slotCode })
+      });
+
+      renderAlerts();
+
+    }catch(err){
+      console.error("Add failed");
+    }
+
   });
 
+/* =========================
+   INIT
+========================= */
+document.addEventListener("DOMContentLoaded",()=>{
   renderAlerts();
-};
-
-// Init
-renderAlerts();
-setInterval(renderAlerts, 5000);
+});
 </script>
-
 </body>
 </html>
