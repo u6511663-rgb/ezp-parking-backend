@@ -134,63 +134,84 @@
 <script>
 const API = "https://ezp-parking-backend.onrender.com";
 
-async function loadBuildings() {
-  try {
-    const res = await fetch("/api/buildings");
-    if (!res.ok) throw new Error("API error");
-
-    const data = await res.json();
-    return data; 
-  } catch (err) {
-    console.error("loadBuildings error:", err);
-    return [];
-  }
+/* =========================
+   FETCH HELPERS
+========================= */
+async function apiGet(path){
+  const r = await fetch(`${API}${path}`);
+  if(!r.ok) throw new Error("API error");
+  return r.json();
 }
 
-async function loadStatus(id) {
-  const res = await fetch(`/api/buildings/${id}/status`);
-  if (!res.ok) throw new Error("Status API error");
-  return res.json();
+/* =========================
+   LOAD DATA
+========================= */
+async function loadBuildings(){
+  return apiGet("/api/buildings");
 }
 
-async function renderHome() {
-  const buildings = await loadBuildings();
+async function loadStatus(id){
+  return apiGet(`/api/buildings/${id}/status`);
+}
+
+/* =========================
+   RENDER HOME
+========================= */
+async function renderHome(){
 
   const big = document.getElementById("bigCards");
   const detail = document.getElementById("detailList");
 
   big.innerHTML = "";
-  detail.innerHTML = "";
+  detail.innerHTML = "<div style='color:var(--muted)'>Loading...</div>";
 
-  if (!buildings.length) {
-    detail.innerHTML = "<div style='color:var(--muted)'>No data</div>";
-    return;
-  }
+  try{
 
-  for (const b of buildings) {
-    const stat = await loadStatus(b.id);
+    const buildings = await loadBuildings();
 
-    const occPct = stat.total
-      ? Math.round((stat.occupied / stat.total) * 100)
-      : 0;
+    if(!buildings.length){
+      detail.innerHTML =
+        "<div style='color:var(--muted)'>No data</div>";
+      return;
+    }
 
-    // BIG CARD
-    big.innerHTML += `
-      <div class="big-card">
+    // 🔥 Load all status in parallel
+    const statuses = await Promise.all(
+      buildings.map(b => loadStatus(b.id))
+    );
+
+    detail.innerHTML = "";
+
+    const bigFrag = document.createDocumentFragment();
+    const detailFrag = document.createDocumentFragment();
+
+    buildings.forEach((b,i)=>{
+
+      const stat = statuses[i];
+      const occPct = stat.total
+        ? Math.round((stat.occupied/stat.total)*100)
+        : 0;
+
+      /* ===== BIG CARD ===== */
+      const bigCard = document.createElement("div");
+      bigCard.className = "big-card";
+      bigCard.innerHTML = `
         <div>
           <div class="title">${b.name}</div>
           <div class="count">${stat.free} / ${stat.total}</div>
           <div class="sub">Free slots</div>
         </div>
-        <button class="view-btn" onclick="location='floor.html?id=${b.id}'">
+        <button class="view-btn"
+          onclick="location='floor.html?id=${b.id}'">
           View
         </button>
-      </div>
-    `;
+      `;
+      bigFrag.appendChild(bigCard);
 
-    // DETAIL
-    detail.innerHTML += `
-      <div class="detail-item">
+      /* ===== DETAIL ===== */
+      const detailItem = document.createElement("div");
+      detailItem.className = "detail-item";
+      detailItem.innerHTML = `
         <div class="detail-left">
           <div class="badge">${b.code}</div>
           <div>
@@ -201,17 +222,32 @@ async function renderHome() {
           </div>
         </div>
         <div style="text-align:right">
-          <div style="color:var(--muted);font-size:12px">just now</div>
+          <div style="color:var(--muted);font-size:12px">
+            ${new Date().toLocaleTimeString()}
+          </div>
           <div class="progress">
             <span style="width:${occPct}%"></span>
           </div>
         </div>
-      </div>
-    `;
+      `;
+      detailFrag.appendChild(detailItem);
+    });
+
+    big.appendChild(bigFrag);
+    detail.appendChild(detailFrag);
+
+  }catch(err){
+    console.error(err);
+    detail.innerHTML =
+      "<div style='color:red'>Connection error</div>";
   }
 }
 
-
-renderHome();
-setInterval(renderHome, 3000);
+/* =========================
+   INIT
+========================= */
+document.addEventListener("DOMContentLoaded", ()=>{
+  renderHome();
+  setInterval(renderHome, 3000);
+});
 </script>
