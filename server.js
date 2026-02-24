@@ -154,6 +154,18 @@ app.get("/api/insights/hourly", async (req, res) => {
     .gte("created_at", start.toISOString())
     .lte("created_at", end.toISOString());
 
+if (status === "free") {
+
+  const { data: alerts } = await supabase
+    .from("alerts")
+    .select("*")
+    .eq("slot_id", slotId)
+    .eq("enabled", true);
+
+  for (const alert of alerts) {
+    await sendNotification(alert, slotId);
+  }
+}
   if (error) return res.status(500).json(error);
 
   const hours = Array(24).fill(0);
