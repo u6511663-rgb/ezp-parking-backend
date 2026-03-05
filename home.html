@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>EZP — Home</title>
 
-<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="commoncss-2ndphase.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 .container{max-width:1100px;margin:20px auto;padding:20px}
@@ -26,6 +27,24 @@
   background:rgba(0,0,0,0.2);
   color:var(--accent);
   font-size:13px;
+}
+
+.header-right{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:flex-end;
+}
+
+.account-link{
+  border:1px solid var(--panel-border);
+  background:transparent;
+  color:var(--text);
+  padding:8px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:800;
 }
 
 /* cards */
@@ -109,7 +128,10 @@
       <div class="app-title">EZP Parking</div>
       <div class="app-sub">Assumption University • Live system</div>
     </div>
-    <div class="online-pill">● Online • ~3s updates</div>
+    <div class="header-right">
+      <button class="account-link" type="button" onclick="location='authhtml-2ndphase.html'">Account</button>
+      <div class="online-pill">● Online • ~3s updates</div>
+    </div>
   </div>
 
   <!-- BIG CARDS -->
@@ -127,95 +149,119 @@
 <div class="bottom-nav">
   <button class="nav-btn active" data-page="home" onclick="location='home.html'">Home</button>
   <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
-  <button class="nav-btn" data-page="insights" onclick="location='insights.html'">Insights</button>
+  <button class="nav-btn" data-page="insights" onclick="location='insighs.html'">Insights</button>
   <button class="nav-btn" data-page="settings" onclick="location='settings.html'">Settings</button>
 </div>
 
 <script>
-const API = "https://ezp-parking-backend.onrender.com";
+// Supabase client (fill with your project URL + anon key)
+const SUPABASE_URL = "https://pyyuzvswiboxccylmmib.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5eXV6dnN3aWJveGNjeWxtbWliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1Nzk2MTEsImV4cCI6MjA4NTE1NTYxMX0.EAOC6UrzfcE3pUe56uAOFsslYBKJG4UEdiGlv7vWDP0";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const FLOORS = [
+  { id: "GND", name: "Ground Level", subtitle: "Entrance left (Y)" },
+  { id: "UPP", name: "Upper Deck", subtitle: "Above ground" }
+];
 
 /* =========================
-   FETCH HELPERS
+   LOAD FLOOR STATS (Supabase)
 ========================= */
-async function apiGet(path){
-  const r = await fetch(`${API}${path}`);
-  if(!r.ok) throw new Error("API error");
-  return r.json();
+async function loadFloorStats() {
+  const { data: slots, error: slotError } = await supabase
+    .from("slots")
+    .select("id, floor, position");
+
+  if (slotError || !slots) {
+    console.error("slots error", slotError);
+    // Fallback so UI still renders while waiting for DB setup
+    return {
+      GND: { total: 3, occupied: 0, free: 3 },
+      UPP: { total: 3, occupied: 0, free: 3 }
+    };
+  }
+
+  const slotIdsByFloor = { GND: [], UPP: [] };
+  slots.forEach((s) => {
+    if (slotIdsByFloor[s.floor]) slotIdsByFloor[s.floor].push(s.id);
+  });
+
+  const { data: statuses, error: statusError } = await supabase
+    .from("slot_status")
+    .select("slot_id, occupied");
+
+  if (statusError) {
+    console.error("slot_status error", statusError);
+    return {
+      GND: { total: 3, occupied: 0, free: 3 },
+      UPP: { total: 3, occupied: 0, free: 3 }
+    };
+  }
+
+  const occupiedBySlot = {};
+  (statuses || []).forEach((s) => {
+    occupiedBySlot[s.slot_id] = !!s.occupied;
+  });
+
+  const stats = {};
+  FLOORS.forEach((f) => {
+    const ids = slotIdsByFloor[f.id] || [];
+    const total = ids.length;
+    const occupied = ids.filter((id) => occupiedBySlot[id]).length;
+    const free = total - occupied;
+    stats[f.id] = { total, occupied, free };
+  });
+
+  return stats;
 }
 
 /* =========================
-   LOAD DATA
+   RENDER HOME (Supabase-direct)
 ========================= */
-async function loadBuildings(){
-  return apiGet("/api/buildings");
-}
-
-async function loadStatus(id){
-  return apiGet(`/api/buildings/${id}/status`);
-}
-
-/* =========================
-   RENDER HOME
-========================= */
-async function renderHome(){
-
+async function renderHome() {
   const big = document.getElementById("bigCards");
   const detail = document.getElementById("detailList");
 
   big.innerHTML = "";
   detail.innerHTML = "<div style='color:var(--muted)'>Loading...</div>";
 
-  try{
-
-    const buildings = await loadBuildings();
-
-    if(!buildings.length){
-      detail.innerHTML =
-        "<div style='color:var(--muted)'>No data</div>";
-      return;
-    }
-
-    // 🔥 Load all status in parallel
-    const statuses = await Promise.all(
-      buildings.map(b => loadStatus(b.id))
-    );
+  try {
+    const stats = await loadFloorStats();
 
     detail.innerHTML = "";
 
     const bigFrag = document.createDocumentFragment();
     const detailFrag = document.createDocumentFragment();
 
-    buildings.forEach((b,i)=>{
-
-      const stat = statuses[i];
+    FLOORS.forEach((floor) => {
+      const stat = stats[floor.id] || { total: 0, occupied: 0, free: 0 };
       const occPct = stat.total
-        ? Math.round((stat.occupied/stat.total)*100)
+        ? Math.round((stat.occupied / stat.total) * 100)
         : 0;
 
-      /* ===== BIG CARD ===== */
       const bigCard = document.createElement("div");
       bigCard.className = "big-card";
       bigCard.innerHTML = `
         <div>
-          <div class="title">${b.name}</div>
+          <div class="title">${floor.name}</div>
           <div class="count">${stat.free} / ${stat.total}</div>
-          <div class="sub">Free slots</div>
+          <div class="sub">${floor.subtitle}</div>
         </div>
         <button class="view-btn"
-          onclick="location='floor.html?id=${b.id}'">
+          onclick="location='floorhtml-2ndphase.html#${floor.id}'">
           View
         </button>
       `;
       bigFrag.appendChild(bigCard);
 
-      /* ===== DETAIL ===== */
       const detailItem = document.createElement("div");
       detailItem.className = "detail-item";
       detailItem.innerHTML = `
         <div class="detail-left">
-          <div class="badge">${b.code}</div>
+          <div class="badge">${floor.id === "GND" ? "G" : "U"}</div>
           <div>
-            <div style="font-weight:800">${b.name}</div>
+            <div style="font-weight:800">${floor.name}</div>
             <div style="color:var(--accent);margin-top:6px">
               Free ${stat.free} / ${stat.total}
             </div>
@@ -235,18 +281,17 @@ async function renderHome(){
 
     big.appendChild(bigFrag);
     detail.appendChild(detailFrag);
-
-  }catch(err){
+  } catch (err) {
     console.error(err);
     detail.innerHTML =
-      "<div style='color:red'>Connection error</div>";
+      "<div style='color:red'>Connection error to Supabase</div>";
   }
 }
 
 /* =========================
    INIT
 ========================= */
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded", () => {
   renderHome();
   setInterval(renderHome, 3000);
 });
