@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — Account</title>
+
+<link rel="stylesheet" href="commoncss-2ndphase.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  .wrap{max-width:900px;margin:18px auto;padding:18px}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .title{font-weight:800;font-size:22px;margin:0}
+  .tabs{margin-top:14px;display:inline-flex;padding:3px;border-radius:999px;background:rgba(255,255,255,0.04)}
+  .tab{border:0;background:transparent;color:var(--muted);padding:7px 14px;border-radius:999px;font-size:13px;cursor:pointer}
+  .tab.active{background:var(--panel);color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,0.45)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .field{display:flex;flex-direction:column;gap:8px}
+  .label{font-size:13px;color:var(--muted)}
+  input{
+    width:100%;
+    padding:12px 12px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.01);
+    color:var(--text);
+    outline:none;
+  }
+  input:focus{border-color:rgba(19,181,211,0.65)}
+
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  .btn-primary{
+    padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    color:#021019;font-weight:800;cursor:pointer
+  }
+  .btn-ghost{
+    padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);
+    background:transparent;color:var(--text);cursor:pointer
+  }
+  .msg{margin-top:12px;font-size:13px;color:var(--muted)}
+  .msg.err{color:var(--danger)}
+  .msg.ok{color:var(--accent)}
+
+  .section-title{margin-top:10px;font-weight:800}
+  .plate-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+
+  @media (max-width:900px){
+    .grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1 class="title">Account</h1>
+      <div class="small">Supabase Auth • email + password</div>
+    </div>
+    <div style="text-align:right">
+      <div class="small card" style="display:inline-block">Online • Auth ready</div>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Account tabs">
+    <button class="tab active" id="tabLogin" type="button">Login</button>
+    <button class="tab" id="tabRegister" type="button">Register</button>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div id="sessionBox" class="msg" style="display:none"></div>
+
+    <!-- LOGIN -->
+    <div id="panelLogin">
+      <div class="grid">
+        <div class="field">
+          <div class="label">Email</div>
+          <input id="loginEmail" type="email" placeholder="name@email.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <div class="label">Password</div>
+          <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="btn-primary" id="btnLogin" type="button">Login</button>
+        <button class="btn-ghost" id="btnLogout" type="button" style="display:none">Logout</button>
+        <button class="btn-ghost" id="btnGoHome" type="button">Go Home</button>
+      </div>
+      <div id="loginMsg" class="msg"></div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="panelRegister" style="display:none">
+      <div class="grid">
+        <div class="field">
+          <div class="label">Email</div>
+          <input id="regEmail" type="email" placeholder="name@email.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <div class="label">Password</div>
+          <input id="regPassword" type="password" placeholder="Choose a password" autocomplete="new-password">
+        </div>
+      </div>
+
+      <div class="section-title">Plate numbers (up to 3)</div>
+      <div class="plate-grid">
+        <div class="field">
+          <div class="label">Plate 1</div>
+          <input id="plate1" type="text" placeholder="ABC-1234">
+        </div>
+        <div class="field">
+          <div class="label">Plate 2 (optional)</div>
+          <input id="plate2" type="text" placeholder="ABC-5678">
+        </div>
+        <div class="field">
+          <div class="label">Plate 3 (optional)</div>
+          <input id="plate3" type="text" placeholder="XYZ-9999">
+        </div>
+      </div>
+      <div class="hint">Plates are saved to the `plates` table and linked to your user.</div>
+
+      <div class="row">
+        <button class="btn-primary" id="btnRegister" type="button">Create account</button>
+        <button class="btn-ghost" id="btnGoHome2" type="button">Go Home</button>
+      </div>
+      <div id="regMsg" class="msg"></div>
+    </div>
+  </div>
+
+  <div style="height:72px"></div>
+</div>
+
+<!-- bottom nav -->
+<div class="bottom-nav">
+  <button class="nav-btn" data-page="home" onclick="location='homehtml-2ndphase.html'">Home</button>
+  <button class="nav-btn" data-page="alerts" onclick="location='alerthtml-2ndphase.html'">Alerts</button>
+  <button class="nav-btn" data-page="insights" onclick="location='insighthtml-2ndphase.html'">Insights</button>
+  <button class="nav-btn" data-page="settings" onclick="location='settinghtml-2ndphase.html'">Settings</button>
+</div>
+
+<script>
+// Supabase project config
+const SUPABASE_URL = "https://pyyuzvswiboxccylmmib.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5eXV6dnN3aWJveGNjeWxtbWliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1Nzk2MTEsImV4cCI6MjA4NTE1NTYxMX0.EAOC6UrzfcE3pUe56uAOFsslYBKJG4UEdiGlv7vWDP0";
+
+var supabaseClient = null;
+if (window.supabase && typeof window.supabase.createClient === "function") {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  console.error("Supabase JS client not loaded. Check the CDN script tag.");
+}
+
+function isSupabaseReady() {
+  return !!(supabaseClient && supabaseClient.auth && supabaseClient.from);
+}
+
+function setActiveTab(which) {
+  const isLogin = which === "login";
+  document.getElementById("tabLogin").classList.toggle("active", isLogin);
+  document.getElementById("tabRegister").classList.toggle("active", !isLogin);
+  document.getElementById("panelLogin").style.display = isLogin ? "" : "none";
+  document.getElementById("panelRegister").style.display = isLogin ? "none" : "";
+  document.getElementById("loginMsg").textContent = "";
+  document.getElementById("regMsg").textContent = "";
+}
+
+function normalizePlate(s) {
+  return (s || "").trim().toUpperCase();
+}
+
+function setMsg(id, text, kind) {
+  const el = document.getElementById(id);
+  el.classList.remove("err", "ok");
+  if (kind) el.classList.add(kind);
+  el.textContent = text || "";
+}
+
+function getPendingPlates(email) {
+  try {
+    const raw = localStorage.getItem(`ezp_pending_plates_${email}`);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function setPendingPlates(email, plates) {
+  localStorage.setItem(`ezp_pending_plates_${email}`, JSON.stringify(plates));
+}
+
+function clearPendingPlates(email) {
+  localStorage.removeItem(`ezp_pending_plates_${email}`);
+}
+
+async function refreshSessionUI() {
+  if (!isSupabaseReady()) {
+    const box = document.getElementById("sessionBox");
+    const logoutBtn = document.getElementById("btnLogout");
+    if (box) box.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    return;
+  }
+  const { data } = await supabaseClient.auth.getSession();
+  const session = (data && data.session) ? data.session : null;
+  const box = document.getElementById("sessionBox");
+  const logoutBtn = document.getElementById("btnLogout");
+
+  if (session && session.user && session.user.email) {
+    box.style.display = "";
+    box.className = "msg ok";
+    box.textContent = `Logged in as ${session.user.email}`;
+    logoutBtn.style.display = "";
+  } else {
+    box.style.display = "none";
+    logoutBtn.style.display = "none";
+  }
+}
+
+async function savePlatesForUser(userId, plates) {
+  if (!isSupabaseReady()) throw new Error("Supabase not ready");
+  const rows = plates
+    .map(normalizePlate)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((plate_number) => ({ user_id: userId, plate_number }));
+
+  if (!rows.length) return { saved: 0 };
+
+  const { error } = await supabaseClient.from("plates").insert(rows);
+  if (error) throw error;
+  return { saved: rows.length };
+}
+
+async function trySavePendingPlatesAfterLogin(email, userId) {
+  const pending = getPendingPlates(email);
+  if (!pending.length) return;
+  try {
+    await savePlatesForUser(userId, pending);
+    clearPendingPlates(email);
+  } catch (e) {
+    // If RLS/table not ready yet, don't block login UX; user can re-save later.
+    console.warn("Failed to save pending plates:", (e && e.message) ? e.message : e);
+  }
+}
+
+document.getElementById("tabLogin").addEventListener("click", function () {
+  setActiveTab("login");
+});
+document.getElementById("tabRegister").addEventListener("click", function () {
+  setActiveTab("register");
+});
+
+document.getElementById("btnGoHome").addEventListener("click", () => (location = "homehtml-2ndphase.html"));
+document.getElementById("btnGoHome2").addEventListener("click", () => (location = "homehtml-2ndphase.html"));
+
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  if (!isSupabaseReady()) {
+    setMsg("loginMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+  setMsg("loginMsg", "", "");
+  const { error } = await supabaseClient.auth.signOut();
+  if (error) setMsg("loginMsg", error.message, "err");
+  await refreshSessionUI();
+});
+
+document.getElementById("btnLogin").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("loginMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+  setMsg("loginMsg", "Signing in...", "");
+
+  const email = (document.getElementById("loginEmail").value || "").trim();
+  const password = document.getElementById("loginPassword").value || "";
+
+  if (!email || !password) {
+    setMsg("loginMsg", "Please enter email and password.", "err");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    setMsg("loginMsg", error.message, "err");
+    return;
+  }
+
+  await refreshSessionUI();
+  const user = data ? data.user : null;
+  if (user && user.id && user.email) {
+    await trySavePendingPlatesAfterLogin(user.email, user.id);
+  }
+
+  setMsg("loginMsg", "Login successful.", "ok");
+  location = "homehtml-2ndphase.html";
+});
+
+document.getElementById("btnRegister").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("regMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+  setMsg("regMsg", "Creating account...", "");
+
+  const email = (document.getElementById("regEmail").value || "").trim();
+  const password = document.getElementById("regPassword").value || "";
+  const plates = [
+    document.getElementById("plate1").value,
+    document.getElementById("plate2").value,
+    document.getElementById("plate3").value,
+  ].map(normalizePlate).filter(Boolean).slice(0, 3);
+
+  if (!email || !password) {
+    setMsg("regMsg", "Please enter email and password.", "err");
+    return;
+  }
+
+  // Save plates locally first (covers email-confirmation flows)
+  if (plates.length) setPendingPlates(email, plates);
+
+  const { data, error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) {
+    setMsg("regMsg", error.message, "err");
+    return;
+  }
+
+  const session = (data && data.session) ? data.session : null;
+  const user = data ? data.user : null;
+
+  // If signup returned a session, we can store plates immediately.
+  if (session && session.user && session.user.id) {
+    try {
+      await savePlatesForUser(session.user.id, plates);
+      clearPendingPlates(email);
+      setMsg("regMsg", "Account created and plates saved.", "ok");
+    } catch (e) {
+      setMsg("regMsg", "Account created. Plates will be saved after you login.", "ok");
+    }
+    await refreshSessionUI();
+    location = "homehtml-2ndphase.html";
+    return;
+  }
+
+  // Email confirmation likely enabled
+  if (user && user.email) {
+    setMsg(
+      "regMsg",
+      "Account created. Check your email to confirm, then login to finish setup.",
+      "ok"
+    );
+    setActiveTab("login");
+  } else {
+    setMsg("regMsg", "Account created. Please login.", "ok");
+    setActiveTab("login");
+  }
+});
+
+document.addEventListener("DOMContentLoaded", async function () {
+  // Ensure tab switching works even if Supabase fails to load.
+  setActiveTab("login");
+
+  if (!isSupabaseReady()) {
+    setMsg(
+      "loginMsg",
+      "Supabase client failed to load. Check your internet or the Supabase CDN script tag.",
+      "err"
+    );
+  } else {
+    await refreshSessionUI();
+    supabaseClient.auth.onAuthStateChange(async function () {
+      await refreshSessionUI();
+    });
+  }
+});
+</script>
+
+</body>
+</html>
+
