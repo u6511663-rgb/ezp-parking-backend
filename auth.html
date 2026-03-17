@@ -739,6 +739,8 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
   setActiveTab("login");
   await refreshSessionUI();
   setMsg("loginMsg", "", "");
+  window.location.replace("auth.html");
+  window.location.reload();
 });
 
 document.getElementById("btnLogin").addEventListener("click", async function () {
