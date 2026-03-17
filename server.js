@@ -89,6 +89,35 @@ function loadEnvFile(filePath) {
   }
 }
 
+async function loadLatestFloorSlots(floorId) {
+  const tableName = floorId === 2 ? "parking_floor2" : "parking_floor1";
+  const { data, error } = await supabase
+    .from(tableName)
+    .select("id, slot, status, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  const latestBySlot = new Map();
+  (data || []).forEach((row) => {
+    if (!latestBySlot.has(row.slot)) {
+      latestBySlot.set(row.slot, row);
+    }
+  });
+
+  return [1, 2, 3].map((slotNumber) => {
+    const latest = latestBySlot.get(slotNumber);
+    return {
+      id: `${floorId}-${slotNumber}`,
+      floor_id: floorId,
+      slot: slotNumber,
+      code: `F${floorId}-0${slotNumber}`,
+      status: latest && latest.status === "occupied" ? "occupied" : "free",
+      created_at: latest ? latest.created_at : null
+    };
+  });
+}
+
 /* ==============================
    HEALTH CHECK
 ============================== */
@@ -161,16 +190,22 @@ app.get("/api/buildings/:id/status", async (req, res, next) => {
 app.get("/api/floors/:id/slots", async (req, res, next) => {
   try {
     const floorId = parseInt(req.params.id, 10);
+    try {
+      const { data, error } = await supabase
+        .from("slots")
+        .select("*")
+        .eq("floor_id", floorId)
+        .order("code");
 
-    const { data, error } = await supabase
-      .from("slots")
-      .select("*")
-      .eq("floor_id", floorId)
-      .order("code");
+      if (!error && Array.isArray(data) && data.length) {
+        return res.json(data.slice(0, 3));
+      }
+    } catch (fallbackIgnored) {
+      // Fall through to the old sensor-table structure.
+    }
 
-    if (error) throw error;
-
-    res.json(data);
+    const latestSlots = await loadLatestFloorSlots(floorId);
+    res.json(latestSlots);
   } catch (err) {
     next(err);
   }
@@ -182,7 +217,7 @@ app.get("/api/floors/:id/slots", async (req, res, next) => {
 
 app.post("/api/slots/:id/status", async (req, res, next) => {
   try {
-    const slotId = parseInt(req.params.id, 10);
+    const slotId = req.params.id;
     const { status } = req.body;
 
     if (!["free", "occupied"].includes(status)) {
@@ -190,6 +225,30 @@ app.post("/api/slots/:id/status", async (req, res, next) => {
     }
 
     const now = new Date();
+    const statusForHistory = status === "free" ? "empty" : "occupied";
+
+    if (String(slotId).includes("-")) {
+      const [floorPart, slotPart] = String(slotId).split("-");
+      const floorId = parseInt(floorPart, 10);
+      const slotNumber = parseInt(slotPart, 10);
+      const tableName = floorId === 2 ? "parking_floor2" : "parking_floor1";
+
+      const { error: historyError } = await supabase
+        .from(tableName)
+        .insert([
+          {
+            slot: slotNumber,
+            status: statusForHistory,
+            created_at: now.toISOString()
+          }
+        ]);
+
+      if (historyError) throw historyError;
+
+      return res.json({ success: true });
+    }
+
+    const numericSlotId = parseInt(slotId, 10);
 
     const { error: updateError } = await supabase
       .from("slots")
@@ -197,7 +256,7 @@ app.post("/api/slots/:id/status", async (req, res, next) => {
         status,
         last_update: now
       })
-      .eq("id", slotId);
+      .eq("id", numericSlotId);
 
     if (updateError) throw updateError;
 
@@ -205,14 +264,14 @@ app.post("/api/slots/:id/status", async (req, res, next) => {
 
     await supabase.from("parking_events").insert([
       {
-        slot_id: slotId,
+        slot_id: numericSlotId,
         action,
         created_at: now
       }
     ]);
 
     if (status === "free") {
-      await triggerAlerts(slotId);
+      await triggerAlerts(numericSlotId);
     }
 
     res.json({ success: true });
