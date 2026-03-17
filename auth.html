@@ -356,6 +356,14 @@ function setMsg(id, text, kind) {
   el.textContent = text || "";
 }
 
+function toggleLoggedInControls(session) {
+  const loggedIn = !!(session && session.user);
+  document.getElementById("btnLogin").style.display = loggedIn ? "none" : "";
+  document.getElementById("btnLogout").style.display = loggedIn ? "" : "none";
+  document.getElementById("loginEmail").disabled = loggedIn;
+  document.getElementById("loginPassword").disabled = loggedIn;
+}
+
 function getPendingRegistration(email) {
   try {
     const raw = localStorage.getItem(`ezp_pending_registration_${email}`);
@@ -515,6 +523,30 @@ async function refreshExistingBookingUI(session) {
 }
 
 async function saveBookingByVehicleId(vehicleId, slotId, startTime, endTime) {
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData ? sessionData.session : null;
+  const userId = session && session.user ? session.user.id : null;
+
+  if (!userId) {
+    throw new Error("Please login again before adding a booking.");
+  }
+
+  const directInsert = await supabaseClient
+    .from("bookings")
+    .insert([
+      {
+        user_id: userId,
+        vehicle_id: vehicleId,
+        slot_id: Number(slotId),
+        start_time: startTime,
+        end_time: endTime
+      }
+    ])
+    .select("id")
+    .single();
+
+  if (!directInsert.error) return true;
+
   const { error } = await supabaseClient.rpc("create_booking", {
     p_vehicle_id: vehicleId,
     p_slot_id: Number(slotId),
@@ -550,17 +582,16 @@ async function refreshSessionUI() {
   const { data } = await supabaseClient.auth.getSession();
   const session = (data && data.session) ? data.session : null;
   const box = document.getElementById("sessionBox");
-  const logoutBtn = document.getElementById("btnLogout");
 
   if (session && session.user && session.user.email) {
     box.style.display = "";
     box.className = "msg ok";
     box.textContent = `Logged in as ${session.user.email}`;
-    logoutBtn.style.display = "";
+    toggleLoggedInControls(session);
     await refreshExistingBookingUI(session);
   } else {
     box.style.display = "none";
-    logoutBtn.style.display = "none";
+    toggleLoggedInControls(null);
     document.getElementById("existingBookingCard").style.display = "none";
   }
 }
@@ -690,8 +721,13 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
   }
   setMsg("loginMsg", "", "");
   const { error } = await supabaseClient.auth.signOut();
-  if (error) setMsg("loginMsg", error.message, "err");
+  if (error) {
+    setMsg("loginMsg", error.message, "err");
+    return;
+  }
+  setMsg("existingBookingMsg", "", "");
   await refreshSessionUI();
+  setMsg("loginMsg", "Logged out.", "ok");
 });
 
 document.getElementById("btnLogin").addEventListener("click", async function () {
