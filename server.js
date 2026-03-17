@@ -1,9 +1,12 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
+
+loadEnvFile(path.join(__dirname, ".env"));
 
 /* ==============================
    MIDDLEWARE
@@ -12,22 +15,30 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "same-origin");
+  next();
+});
 
 /* ==============================
    SUPABASE INIT
 ============================== */
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
-  console.error("❌ Missing Supabase ENV");
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SUPABASE_ANON_KEY) {
+  console.error("Missing required Supabase environment variables");
   process.exit(1);
 }
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-console.log("🔗 Supabase connected");
+console.log("Supabase connected");
 
 /* ==============================
    UTIL
@@ -52,12 +63,45 @@ function getDayRange(day = "today") {
   return { start, end };
 }
 
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+
+  const envLines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const rawLine of envLines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex === -1) continue;
+
+    const key = line.slice(0, separatorIndex).trim();
+    if (!key || process.env[key]) continue;
+
+    let value = line.slice(separatorIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
+}
+
 /* ==============================
    HEALTH CHECK
 ============================== */
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/api/public-config", (req, res) => {
+  res.json({
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
 });
 
 /* ==============================
@@ -74,9 +118,7 @@ app.get("/", (req, res) => {
 
 app.get("/api/buildings", async (req, res, next) => {
   try {
-    const { data, error } = await supabase
-      .from("buildings")
-      .select("*");
+    const { data, error } = await supabase.from("buildings").select("*");
 
     if (error) throw error;
 
@@ -91,7 +133,7 @@ app.get("/api/buildings", async (req, res, next) => {
 
 app.get("/api/buildings/:id/status", async (req, res, next) => {
   try {
-    const buildingId = parseInt(req.params.id);
+    const buildingId = parseInt(req.params.id, 10);
 
     const { data, error } = await supabase
       .from("slots")
@@ -101,14 +143,13 @@ app.get("/api/buildings/:id/status", async (req, res, next) => {
     if (error) throw error;
 
     const total = data.length;
-    const occupied = data.filter(s => s.status === "occupied").length;
+    const occupied = data.filter((s) => s.status === "occupied").length;
 
     res.json({
       total,
       occupied,
       free: total - occupied
     });
-
   } catch (err) {
     next(err);
   }
@@ -119,7 +160,7 @@ app.get("/api/buildings/:id/status", async (req, res, next) => {
 
 app.get("/api/floors/:id/slots", async (req, res, next) => {
   try {
-    const floorId = parseInt(req.params.id);
+    const floorId = parseInt(req.params.id, 10);
 
     const { data, error } = await supabase
       .from("slots")
@@ -141,7 +182,7 @@ app.get("/api/floors/:id/slots", async (req, res, next) => {
 
 app.post("/api/slots/:id/status", async (req, res, next) => {
   try {
-    const slotId = parseInt(req.params.id);
+    const slotId = parseInt(req.params.id, 10);
     const { status } = req.body;
 
     if (!["free", "occupied"].includes(status)) {
@@ -150,7 +191,6 @@ app.post("/api/slots/:id/status", async (req, res, next) => {
 
     const now = new Date();
 
-    // update slot
     const { error: updateError } = await supabase
       .from("slots")
       .update({
@@ -161,22 +201,21 @@ app.post("/api/slots/:id/status", async (req, res, next) => {
 
     if (updateError) throw updateError;
 
-    // log event
     const action = status === "occupied" ? "enter" : "exit";
 
-    await supabase.from("parking_events").insert([{
-      slot_id: slotId,
-      action,
-      created_at: now
-    }]);
+    await supabase.from("parking_events").insert([
+      {
+        slot_id: slotId,
+        action,
+        created_at: now
+      }
+    ]);
 
-    // 🔔 ALERT TRIGGER
     if (status === "free") {
       await triggerAlerts(slotId);
     }
 
     res.json({ success: true });
-
   } catch (err) {
     next(err);
   }
@@ -187,7 +226,6 @@ app.post("/api/slots/:id/status", async (req, res, next) => {
 ============================== */
 
 async function triggerAlerts(slotId) {
-
   const { data: alerts } = await supabase
     .from("alerts")
     .select("*")
@@ -197,15 +235,15 @@ async function triggerAlerts(slotId) {
   if (!alerts || alerts.length === 0) return;
 
   for (const alert of alerts) {
+    console.log(`Alert triggered for slot ${slotId}`);
 
-    // mock notification (replace with real push/email later)
-    console.log(`🔔 Alert triggered for slot ${slotId}`);
-
-    await supabase.from("notifications_log").insert([{
-      alert_id: alert.id,
-      slot_id: slotId,
-      sent_at: new Date()
-    }]);
+    await supabase.from("notifications_log").insert([
+      {
+        alert_id: alert.id,
+        slot_id: slotId,
+        sent_at: new Date()
+      }
+    ]);
   }
 }
 
@@ -215,14 +253,12 @@ async function triggerAlerts(slotId) {
 
 app.get("/api/zone/status", async (req, res, next) => {
   try {
-    const { data, error } = await supabase
-      .from("slots")
-      .select("status");
+    const { data, error } = await supabase.from("slots").select("status");
 
     if (error) throw error;
 
     const total = data.length;
-    const occupied = data.filter(s => s.status === "occupied").length;
+    const occupied = data.filter((s) => s.status === "occupied").length;
 
     res.json({
       total,
@@ -253,7 +289,7 @@ app.get("/api/insights/hourly", async (req, res, next) => {
 
     const hours = Array(24).fill(0);
 
-    data.forEach(e => {
+    data.forEach((e) => {
       if (e.action !== "enter") return;
       const h = new Date(e.created_at).getHours();
       hours[h]++;
@@ -268,7 +304,6 @@ app.get("/api/insights/hourly", async (req, res, next) => {
         percent: Math.round((count / max) * 100)
       }))
     );
-
   } catch (err) {
     next(err);
   }
@@ -300,7 +335,6 @@ app.get("/api/insights/weekly", async (req, res, next) => {
     }
 
     res.json(result);
-
   } catch (err) {
     next(err);
   }
@@ -312,13 +346,11 @@ app.get("/api/insights/weekly", async (req, res, next) => {
 
 app.get("/api/insights/heatmap", async (req, res, next) => {
   try {
-    const { data } = await supabase
-      .from("parking_events")
-      .select("created_at");
+    const { data } = await supabase.from("parking_events").select("created_at");
 
     const grid = {};
 
-    data.forEach(e => {
+    data.forEach((e) => {
       const d = new Date(e.created_at);
       const day = d.getDay();
       const hour = d.getHours();
@@ -327,7 +359,6 @@ app.get("/api/insights/heatmap", async (req, res, next) => {
     });
 
     res.json(grid);
-
   } catch (err) {
     next(err);
   }
@@ -338,7 +369,7 @@ app.get("/api/insights/heatmap", async (req, res, next) => {
 ============================== */
 
 app.use((err, req, res, next) => {
-  console.error("❌ SERVER ERROR:", err.message);
+  console.error("SERVER ERROR:", err.message);
   res.status(500).json({ error: "Internal Server Error" });
 });
 
@@ -349,5 +380,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

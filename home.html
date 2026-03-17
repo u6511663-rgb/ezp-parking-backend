@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>EZP — Home</title>
 
-<link rel="stylesheet" href="commoncss-2ndphase.css">
+<link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -154,70 +154,52 @@
 </div>
 
 <script>
-// Supabase client (fill with your project URL + anon key)
-const SUPABASE_URL = "https://pyyuzvswiboxccylmmib.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5eXV6dnN3aWJveGNjeWxtbWliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1Nzk2MTEsImV4cCI6MjA4NTE1NTYxMX0.EAOC6UrzfcE3pUe56uAOFsslYBKJG4UEdiGlv7vWDP0";
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 const FLOORS = [
   { id: "GND", name: "Ground Level", subtitle: "Entrance left (Y)" },
   { id: "UPP", name: "Upper Deck", subtitle: "Above ground" }
 ];
 
 /* =========================
-   LOAD FLOOR STATS (Supabase)
+   LOAD FLOOR STATS
 ========================= */
 async function loadFloorStats() {
-  const { data: slots, error: slotError } = await supabase
-    .from("slots")
-    .select("id, floor, position");
+  const fallback = {
+    GND: { total: 3, occupied: 0, free: 3 },
+    UPP: { total: 3, occupied: 0, free: 3 }
+  };
 
-  if (slotError || !slots) {
-    console.error("slots error", slotError);
-    // Fallback so UI still renders while waiting for DB setup
-    return {
-      GND: { total: 3, occupied: 0, free: 3 },
-      UPP: { total: 3, occupied: 0, free: 3 }
-    };
+  const responses = await Promise.all(
+    [1, 2].map(async (floorId, index) => {
+      const response = await fetch(`/api/floors/${floorId}/slots`, {
+        headers: { Accept: "application/json" }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Unable to load floor ${floorId}`);
+      }
+
+      const slots = await response.json();
+      const total = Array.isArray(slots) ? slots.length : 0;
+      const occupied = Array.isArray(slots)
+        ? slots.filter((slot) => slot.status === "occupied").length
+        : 0;
+
+      return [FLOORS[index].id, { total, occupied, free: total - occupied }];
+    })
+  ).catch((error) => {
+    console.error("floor stats error", error);
+    return null;
+  });
+
+  if (!responses) {
+    return fallback;
   }
 
-  const slotIdsByFloor = { GND: [], UPP: [] };
-  slots.forEach((s) => {
-    if (slotIdsByFloor[s.floor]) slotIdsByFloor[s.floor].push(s.id);
-  });
-
-  const { data: statuses, error: statusError } = await supabase
-    .from("slot_status")
-    .select("slot_id, occupied");
-
-  if (statusError) {
-    console.error("slot_status error", statusError);
-    return {
-      GND: { total: 3, occupied: 0, free: 3 },
-      UPP: { total: 3, occupied: 0, free: 3 }
-    };
-  }
-
-  const occupiedBySlot = {};
-  (statuses || []).forEach((s) => {
-    occupiedBySlot[s.slot_id] = !!s.occupied;
-  });
-
-  const stats = {};
-  FLOORS.forEach((f) => {
-    const ids = slotIdsByFloor[f.id] || [];
-    const total = ids.length;
-    const occupied = ids.filter((id) => occupiedBySlot[id]).length;
-    const free = total - occupied;
-    stats[f.id] = { total, occupied, free };
-  });
-
-  return stats;
+  return Object.fromEntries(responses);
 }
 
 /* =========================
-   RENDER HOME (Supabase-direct)
+   RENDER HOME
 ========================= */
 async function renderHome() {
   const big = document.getElementById("bigCards");
