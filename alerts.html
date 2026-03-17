@@ -96,6 +96,11 @@
     grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:12px;
   }
+  .booking-actions{
+    margin-top:14px;
+    display:flex;
+    justify-content:flex-end;
+  }
   .booking-meta{
     border-radius:14px;
     padding:12px;
@@ -107,6 +112,18 @@
   }
   .page-msg{
     margin-top:16px;
+  }
+  .cancel-btn{
+    border:1px solid rgba(226,84,84,0.28);
+    background:rgba(226,84,84,0.08);
+    color:#ff8f8f;
+    padding:10px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .cancel-btn:hover{
+    background:rgba(226,84,84,0.14);
   }
   @media (max-width:720px){
     .top-header{
@@ -257,6 +274,15 @@ async function loadUserBookings(userId) {
   return Array.isArray(data) ? data : [];
 }
 
+async function cancelBooking(bookingId) {
+  const { error } = await supabaseClient
+    .from("bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId);
+
+  if (error) throw error;
+}
+
 function renderBookings(bookings) {
   const summary = document.getElementById("alertsSummary");
   const container = document.getElementById("alertsContainer");
@@ -310,9 +336,36 @@ function renderBookings(bookings) {
           <div>${formatDateTime(booking.end_time)}</div>
         </div>
       </div>
+      <div class="booking-actions">
+        <button class="cancel-btn" type="button" data-cancel-booking="${booking.id}">Cancel booking</button>
+      </div>
     `;
 
     container.appendChild(card);
+  });
+
+  container.querySelectorAll("[data-cancel-booking]").forEach((button) => {
+    button.addEventListener("click", async function () {
+      const bookingId = button.getAttribute("data-cancel-booking");
+      if (!bookingId) return;
+
+      const confirmed = window.confirm("Cancel this booking?");
+      if (!confirmed) return;
+
+      button.disabled = true;
+      button.textContent = "Cancelling...";
+      setMsg("", "");
+
+      try {
+        await cancelBooking(bookingId);
+        setMsg("Booking cancelled.", "ok");
+        await renderAlertsPage();
+      } catch (err) {
+        button.disabled = false;
+        button.textContent = "Cancel booking";
+        setMsg(err.message || "Could not cancel booking.", "err");
+      }
+    });
   });
 }
 
