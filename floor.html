@@ -373,6 +373,17 @@ function createSlotEl(slot){
   return el;
 }
 
+function buildDefaultSlot(level, index, floorId) {
+  return {
+    id: `${floorId}-${index + 1}`,
+    floor_id: floorId,
+    slot: index + 1,
+    code: `${level}-S${index + 1}`,
+    displayCode: `${level}-0${index + 1}`,
+    status: "free"
+  };
+}
+
 /* =========================
    RENDER FLOOR
 ========================= */
@@ -385,8 +396,12 @@ async function renderLayout(level){
 
   const SLOT_MAP = {};
   let free = 0;
+  const normalizedSlots = Array.from({ length: 3 }, (_, index) => {
+    const source = Array.isArray(slots) ? slots[index] : null;
+    if (!source) {
+      return buildDefaultSlot(level, index, floorId);
+    }
 
-  slots.forEach((s, index)=>{
     const displayCode = level === "F2"
       ? `F2-0${index + 1}`
       : `F1-0${index + 1}`;
@@ -394,11 +409,20 @@ async function renderLayout(level){
       ? `F2-S${index + 1}`
       : `F1-S${index + 1}`;
 
-    SLOT_MAP[syntheticCode] = { ...s, displayCode };
-    if(s.status === "free") free++;
+    return {
+      ...source,
+      code: syntheticCode,
+      displayCode,
+      status: source.status === "occupied" ? "occupied" : "free"
+    };
   });
 
-  const total = slots.length;
+  normalizedSlots.forEach((slot) => {
+    SLOT_MAP[slot.code] = slot;
+    if(slot.status === "free") free++;
+  });
+
+  const total = normalizedSlots.length;
   const occ = total - free;
 
   document.getElementById("counts").textContent =
