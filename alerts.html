@@ -3,25 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EZP — Alerts</title>
+<title>EZP - Alerts</title>
 
 <link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  .alerts-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+  }
+  .alerts-list{
+    display:grid;
+    gap:12px;
+    margin-top:18px;
+  }
+  .booking-card{
+    border:1px solid var(--panel-border);
+    border-radius:18px;
+    background:rgba(255,255,255,0.02);
+    padding:16px;
+  }
+  .booking-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .booking-title{
+    font-size:18px;
+    font-weight:800;
+  }
+  .booking-badges{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    border:1px solid rgba(255,255,255,0.08);
+  }
+  .status-pill.upcoming{
+    color:#ffd27a;
+    background:rgba(255,210,122,0.12);
+  }
+  .status-pill.active{
+    color:#68f2bb;
+    background:rgba(104,242,187,0.12);
+  }
+  .status-pill.done{
+    color:var(--muted);
+    background:rgba(255,255,255,0.05);
+  }
+  .booking-grid{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+  }
+  .booking-meta{
+    border-radius:14px;
+    padding:12px;
+    background:rgba(255,255,255,0.02);
+  }
+  .booking-meta .small{
+    display:block;
+    margin-bottom:4px;
+  }
+  .page-msg{
+    margin-top:16px;
+  }
+  @media (max-width:720px){
+    .booking-grid{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
 </head>
 <body>
 
 <div class="container">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div class="alerts-header">
     <div>
       <h1>Alerts</h1>
-      <div class="small">Get notified when spots become available</div>
+      <div class="small">Your booking alerts and upcoming parking times</div>
     </div>
-    <div>
-      <button class="chip" id="addAlert">+</button>
-    </div>
+    <button class="btn-ghost" type="button" onclick="location='./auth.html'">Account</button>
   </div>
 
   <div class="card" style="margin-top:18px">
-    <div id="alertsContainer"></div>
+    <div id="alertsSummary" class="small">Loading your bookings...</div>
+    <div id="alertsMsg" class="small page-msg"></div>
+    <div id="alertsContainer" class="alerts-list"></div>
   </div>
 </div>
 
@@ -32,139 +113,197 @@
 </div>
 
 <script>
-const API = "/api";
+let supabaseClient = null;
 
-/* =========================
-   LOAD ALERTS
-========================= */
-async function loadAlerts(){
-  try{
-    const r = await fetch(`${API}/alerts`);
-    if(!r.ok) throw new Error("Failed to load alerts");
-    return await r.json();
-  }catch(err){
-    console.error(err);
-    return [];
+async function initSupabaseClient() {
+  const response = await fetch("/api/public-config", {
+    headers: { Accept: "application/json" }
+  });
+
+  if (!response.ok) {
+    throw new Error("Public Supabase config is not available.");
   }
+
+  const config = await response.json();
+  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    throw new Error("Supabase config is incomplete.");
+  }
+
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
 }
 
-/* =========================
-   RENDER ALERTS
-========================= */
-async function renderAlerts(){
+function setMsg(text, kind) {
+  const box = document.getElementById("alertsMsg");
+  box.textContent = text || "";
+  box.className = "small page-msg";
+  if (kind === "err") box.style.color = "var(--danger)";
+  else if (kind === "ok") box.style.color = "var(--accent)";
+  else box.style.color = "";
+}
 
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-GB", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getTimingState(booking) {
+  const now = Date.now();
+  const start = new Date(booking.start_time).getTime();
+  const end = new Date(booking.end_time).getTime();
+
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    return { label: "Unknown", className: "done", detail: "Time unavailable" };
+  }
+
+  if (now < start) {
+    const minutes = Math.ceil((start - now) / 60000);
+    return {
+      label: "Upcoming",
+      className: "upcoming",
+      detail: minutes <= 1 ? "Starts very soon" : `Starts in ${minutes} minutes`
+    };
+  }
+
+  if (now <= end) {
+    return {
+      label: "Active",
+      className: "active",
+      detail: "Booking is active now"
+    };
+  }
+
+  return {
+    label: "Completed",
+    className: "done",
+    detail: "Booking time has passed"
+  };
+}
+
+async function loadUserBookings(userId) {
+  const { data, error } = await supabaseClient
+    .from("bookings")
+    .select(`
+      id,
+      start_time,
+      end_time,
+      status,
+      created_at,
+      vehicle_registrations:vehicle_id (
+        plate_number,
+        registration_city
+      ),
+      parking_slots:slot_id (
+        code,
+        slot_number,
+        floor_id,
+        parking_floors:floor_id (
+          name,
+          code
+        )
+      )
+    `)
+    .eq("user_id", userId)
+    .order("start_time", { ascending: true });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+function renderBookings(bookings) {
+  const summary = document.getElementById("alertsSummary");
   const container = document.getElementById("alertsContainer");
-  container.innerHTML = "<div class='small'>Loading...</div>";
 
-  const alerts = await loadAlerts();
-
-  if(!alerts.length){
-    container.innerHTML =
-      "<div class='small'>No alerts yet — click + to add one.</div>";
+  if (!bookings.length) {
+    summary.textContent = "No bookings yet.";
+    container.innerHTML = "<div class='small'>When you book a slot, it will show here.</div>";
     return;
   }
 
+  summary.textContent = `${bookings.length} booking${bookings.length === 1 ? "" : "s"} found`;
   container.innerHTML = "";
 
-  alerts.forEach(a=>{
+  bookings.forEach((booking) => {
+    const timing = getTimingState(booking);
+    const slot = booking.parking_slots || {};
+    const floor = slot.parking_floors || {};
+    const vehicle = booking.vehicle_registrations || {};
+    const slotLabel = slot.code || (slot.slot_number ? `Slot ${slot.slot_number}` : "Unknown slot");
+    const floorLabel = floor.name || floor.code || (slot.floor_id ? `Floor ${slot.floor_id}` : "-");
+    const cityLabel = vehicle.registration_city ? ` • ${vehicle.registration_city}` : "";
 
-    const row = document.createElement("div");
-    row.className = "alert-item";
-
-    row.innerHTML = `
-      <div style="display:flex;gap:12px;align-items:flex-start">
-        <div class="badge">${a.slot_code}</div>
+    const card = document.createElement("div");
+    card.className = "booking-card";
+    card.innerHTML = `
+      <div class="booking-head">
         <div>
-          <div style="font-weight:700">Slot ${a.slot_code}</div>
-          <div class="small">Notify when free</div>
+          <div class="booking-title">${slotLabel}</div>
+          <div class="small">${floorLabel}</div>
+        </div>
+        <div class="booking-badges">
+          <div class="status-pill ${timing.className}">${timing.label}</div>
+          <div class="status-pill">${booking.status || "booked"}</div>
         </div>
       </div>
-
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="toggle ${a.enabled ? 'on' : ''}" data-id="${a.id}">
-          <div class="knob"></div>
+      <div class="booking-grid">
+        <div class="booking-meta">
+          <span class="small">Car</span>
+          <div>${vehicle.plate_number || "-"}${cityLabel}</div>
         </div>
-        <div class="icon-btn" data-del="${a.id}">🗑</div>
+        <div class="booking-meta">
+          <span class="small">Reminder</span>
+          <div>${timing.detail}</div>
+        </div>
+        <div class="booking-meta">
+          <span class="small">Start time</span>
+          <div>${formatDateTime(booking.start_time)}</div>
+        </div>
+        <div class="booking-meta">
+          <span class="small">End time</span>
+          <div>${formatDateTime(booking.end_time)}</div>
+        </div>
       </div>
     `;
 
-    container.appendChild(row);
-  });
-
-  /* ===== TOGGLE ===== */
-  document.querySelectorAll(".toggle").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      try{
-        await fetch(`${API}/alerts/${btn.dataset.id}/toggle`,{
-          method:"PUT"
-        });
-        renderAlerts();
-      }catch(e){
-        console.error("Toggle failed");
-      }
-    });
-  });
-
-  /* ===== DELETE ===== */
-  document.querySelectorAll("[data-del]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      try{
-        await fetch(`${API}/alerts/${btn.dataset.del}`,{
-          method:"DELETE"
-        });
-        renderAlerts();
-      }catch(e){
-        console.error("Delete failed");
-      }
-    });
+    container.appendChild(card);
   });
 }
 
-/* =========================
-   ADD ALERT
-========================= */
-document.getElementById("addAlert")
-  .addEventListener("click", async ()=>{
+async function renderAlertsPage() {
+  const summary = document.getElementById("alertsSummary");
+  summary.textContent = "Loading your bookings...";
+  setMsg("", "");
 
-    const slotCode = prompt("Enter SLOT CODE (example: G02)");
+  try {
+    await initSupabaseClient();
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
 
-    if(!slotCode) return;
-
-    try{
-      await fetch(`${API}/alerts`,{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ slot_code: slotCode })
-      });
-
-      renderAlerts();
-
-    }catch(err){
-      console.error("Add failed");
+    const session = data ? data.session : null;
+    if (!session || !session.user) {
+      summary.textContent = "Please login first.";
+      document.getElementById("alertsContainer").innerHTML =
+        "<div class='small'>Login on the Account page to see your bookings here.</div>";
+      return;
     }
 
-  });
-async function sendNotification(alert, slotId) {
-
-  const message = `Slot ${slotId} is now FREE`;
-
-  console.log("🔔 Sending notification:", message);
-
-  // Insert log
-  await supabase
-    .from("notifications_log")
-    .insert([{
-      alert_id: alert.id,
-      slot_id: slotId,
-      message,
-      success: true
-    }]);
+    const bookings = await loadUserBookings(session.user.id);
+    renderBookings(bookings);
+  } catch (err) {
+    summary.textContent = "Could not load bookings.";
+    document.getElementById("alertsContainer").innerHTML = "";
+    setMsg(err.message || "Failed to load alerts.", "err");
+  }
 }
-/* =========================
-   INIT
-========================= */
-document.addEventListener("DOMContentLoaded",()=>{
-  renderAlerts();
+
+document.addEventListener("DOMContentLoaded", function () {
+  renderAlertsPage();
 });
 </script>
 </body>

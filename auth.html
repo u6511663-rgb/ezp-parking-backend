@@ -61,6 +61,25 @@
   .msg{margin-top:12px;font-size:13px;color:var(--muted)}
   .msg.err{color:var(--danger)}
   .msg.ok{color:var(--accent)}
+  .msg.warn{
+    color:#ffd27a;
+  }
+  .booking-alert{
+    display:none;
+    margin-top:14px;
+    padding:14px 16px;
+    border-radius:14px;
+    border:1px solid rgba(255,210,122,0.26);
+    background:linear-gradient(180deg, rgba(255,210,122,0.14), rgba(255,210,122,0.08));
+    color:#fff1cb;
+  }
+  .booking-alert.show{
+    display:block;
+  }
+  .booking-alert-title{
+    font-weight:800;
+    margin-bottom:6px;
+  }
 
   .section-title{margin-top:10px;font-weight:800}
   .plate-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
@@ -91,6 +110,10 @@
 
   <div class="card" style="margin-top:14px">
     <div id="sessionBox" class="msg" style="display:none"></div>
+    <div id="bookingReminderBox" class="booking-alert">
+      <div class="booking-alert-title">Upcoming booking</div>
+      <div id="bookingReminderText" class="small"></div>
+    </div>
 
     <!-- LOGIN -->
     <div id="panelLogin">
@@ -256,6 +279,9 @@
 var supabaseClient = null;
 var existingVehicles = [];
 var reservableSlots = [];
+var bookingReminderTimer = null;
+var latestReminderBookingId = null;
+const BOOKING_ALERT_LEAD_MINUTES = 10;
 const THAI_PROVINCES = [
   "กรุงเทพมหานคร", "กระบี่", "กาญจนบุรี", "กาฬสินธุ์", "กำแพงเพชร", "ขอนแก่น",
   "จันทบุรี", "ฉะเชิงเทรา", "ชลบุรี", "ชัยนาท", "ชัยภูมิ", "ชุมพร",
@@ -370,6 +396,124 @@ function resetLoginForm() {
   document.getElementById("existingBookingMsg").textContent = "";
   document.getElementById("existingVehicle").innerHTML = '<option value="">Select registered car</option>';
   document.getElementById("existingSlot").innerHTML = '<option value="">Select slot</option>';
+}
+
+function getReminderStorageKey(bookingId) {
+  return `ezp_booking_alert_${bookingId}`;
+}
+
+function getSlotLabelById(slotId) {
+  const matched = reservableSlots.find((slot) => String(slot.id) === String(slotId));
+  if (!matched) return `Slot ${slotId}`;
+  return matched.code || `Slot ${matched.slot_number}`;
+}
+
+function getVehicleLabelById(vehicleId) {
+  const matched = existingVehicles.find((vehicle) => String(vehicle.id) === String(vehicleId));
+  return matched ? vehicleLabel(matched) : "your registered car";
+}
+
+function clearBookingReminderBox() {
+  latestReminderBookingId = null;
+  const box = document.getElementById("bookingReminderBox");
+  const text = document.getElementById("bookingReminderText");
+  box.classList.remove("show");
+  text.textContent = "";
+}
+
+function showBookingReminder(booking, minutesAway) {
+  latestReminderBookingId = booking.id;
+  const slotLabel = getSlotLabelById(booking.slot_id);
+  const carLabel = getVehicleLabelById(booking.vehicle_id);
+  const box = document.getElementById("bookingReminderBox");
+  const text = document.getElementById("bookingReminderText");
+  const roundedMinutes = Math.max(0, minutesAway);
+  const timeLabel = roundedMinutes <= 1 ? "less than 1 minute" : `${roundedMinutes} minutes`;
+
+  text.textContent = `${carLabel} is booked for ${slotLabel}. Your booking starts in ${timeLabel}.`;
+  box.classList.add("show");
+}
+
+function notifySoonBooking(booking, minutesAway) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  const alreadySent = localStorage.getItem(getReminderStorageKey(booking.id));
+  if (alreadySent) return;
+
+  const slotLabel = getSlotLabelById(booking.slot_id);
+  const roundedMinutes = Math.max(0, minutesAway);
+  const body = roundedMinutes <= 1
+    ? `${slotLabel} starts very soon.`
+    : `${slotLabel} starts in ${roundedMinutes} minutes.`;
+
+  new Notification("EZP Booking Reminder", {
+    body,
+    tag: `booking-${booking.id}`
+  });
+
+  localStorage.setItem(getReminderStorageKey(booking.id), new Date().toISOString());
+}
+
+async function loadUpcomingBookingsForUser(userId) {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseClient
+    .from("bookings")
+    .select("id, user_id, vehicle_id, slot_id, start_time, end_time, status")
+    .eq("user_id", userId)
+    .gte("end_time", nowIso)
+    .order("start_time", { ascending: true })
+    .limit(10);
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function checkUpcomingBookingReminder(session) {
+  if (!session || !session.user) {
+    clearBookingReminderBox();
+    return;
+  }
+
+  try {
+    const bookings = await loadUpcomingBookingsForUser(session.user.id);
+    const now = Date.now();
+
+    const soonBooking = bookings.find((booking) => {
+      if (booking.status && !["booked", "confirmed", "checked_in"].includes(booking.status)) {
+        return false;
+      }
+      const startMs = new Date(booking.start_time).getTime();
+      if (Number.isNaN(startMs)) return false;
+      const diffMinutes = (startMs - now) / 60000;
+      return diffMinutes >= 0 && diffMinutes <= BOOKING_ALERT_LEAD_MINUTES;
+    });
+
+    if (!soonBooking) {
+      clearBookingReminderBox();
+      return;
+    }
+
+    const minutesAway = Math.ceil((new Date(soonBooking.start_time).getTime() - now) / 60000);
+    showBookingReminder(soonBooking, minutesAway);
+    notifySoonBooking(soonBooking, minutesAway);
+  } catch (err) {
+    console.warn("Failed to check booking reminder:", err.message || err);
+  }
+}
+
+function stopBookingReminderPolling() {
+  if (bookingReminderTimer) {
+    clearInterval(bookingReminderTimer);
+    bookingReminderTimer = null;
+  }
+}
+
+async function startBookingReminderPolling(session) {
+  stopBookingReminderPolling();
+  await checkUpcomingBookingReminder(session);
+  bookingReminderTimer = window.setInterval(async function () {
+    await checkUpcomingBookingReminder(session);
+  }, 60000);
 }
 
 function getPendingRegistration(email) {
@@ -597,12 +741,15 @@ async function refreshSessionUI() {
     box.textContent = `Logged in as ${session.user.email}`;
     toggleLoggedInControls(session);
     await refreshExistingBookingUI(session);
+    await startBookingReminderPolling(session);
   } else {
     box.style.display = "none";
     box.textContent = "";
     box.className = "msg";
     toggleLoggedInControls(null);
     document.getElementById("existingBookingCard").style.display = "none";
+    stopBookingReminderPolling();
+    clearBookingReminderBox();
   }
 }
 
@@ -800,6 +947,13 @@ document.getElementById("btnAddBooking").addEventListener("click", async functio
   try {
     await saveBookingByVehicleId(vehicleId, slotId, startTime.toISOString(), endTime.toISOString());
     setMsg("existingBookingMsg", "Booking saved successfully.", "ok");
+    const { data } = await supabaseClient.auth.getSession();
+    const session = data ? data.session : null;
+    await checkUpcomingBookingReminder(session);
+
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
   } catch (err) {
     setMsg("existingBookingMsg", err.message || "Booking failed.", "err");
   }
