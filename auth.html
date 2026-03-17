@@ -115,15 +115,27 @@
           <input id="plate1" type="text" placeholder="กข 1234">
         </div>
         <div class="field">
+          <div class="label">City / Province 1</div>
+          <input id="plate1City" type="text" placeholder="กรุงเทพมหานคร">
+        </div>
+        <div class="field">
           <div class="label">Plate 2 (optional)</div>
           <input id="plate2" type="text" placeholder="1กข 2345">
+        </div>
+        <div class="field">
+          <div class="label">City / Province 2 (optional)</div>
+          <input id="plate2City" type="text" placeholder="เชียงใหม่">
         </div>
         <div class="field">
           <div class="label">Plate 3 (optional)</div>
           <input id="plate3" type="text" placeholder="ขค 3456">
         </div>
+        <div class="field">
+          <div class="label">City / Province 3 (optional)</div>
+          <input id="plate3City" type="text" placeholder="ขอนแก่น">
+        </div>
       </div>
-      <div class="hint">Thai and English license plates are supported and saved to the `vehicle_registrations` table.</div>
+      <div class="hint">Thai and English license plates are supported. For Thai plates, save the city/province shown on the plate too.</div>
 
       <div class="section-title">Booking (optional)</div>
       <div class="grid">
@@ -231,6 +243,12 @@ function normalizePlate(s) {
     .toUpperCase();
 }
 
+function normalizeRegistrationCity(s) {
+  return (s || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function toLocalInputValue(date) {
   const pad = (value) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -278,9 +296,16 @@ function getBookingPayloadFromForm() {
   const plateValue = normalizePlate(
     document.getElementById(`plate${bookingPlateChoice}`).value
   );
+  const registrationCity = normalizeRegistrationCity(
+    document.getElementById(`plate${bookingPlateChoice}City`).value
+  );
 
   if (!plateValue) {
     throw new Error("The selected booking plate is empty. Please enter that car plate first.");
+  }
+
+  if (!registrationCity) {
+    throw new Error("Please enter the city or province for the selected booking plate.");
   }
 
   const startTime = new Date(startValue);
@@ -292,6 +317,7 @@ function getBookingPayloadFromForm() {
 
   return {
     plateNumber: plateValue,
+    registrationCity,
     floorNo: Number(floorId),
     slot: Number(slotId),
     startTime: startTime.toISOString(),
@@ -340,20 +366,21 @@ async function refreshSessionUI() {
 async function saveVehiclesForUser(userId, plates) {
   if (!isSupabaseReady()) throw new Error("Supabase not ready");
   const rows = plates
-    .map(normalizePlate)
-    .filter(Boolean)
-    .slice(0, 3)
-    .map((plate_number) => ({
+    .map((plate) => ({
       user_id: userId,
-      plate_number
-    }));
+      plate_number: normalizePlate(plate.plateNumber),
+      registration_city: normalizeRegistrationCity(plate.registrationCity)
+    }))
+    .filter((plate) => plate.plate_number && plate.registration_city)
+    .slice(0, 3)
+    .map((plate) => plate);
 
   if (!rows.length) return [];
 
   const { data, error } = await supabaseClient
     .from("vehicle_registrations")
-    .upsert(rows, { onConflict: "user_id,plate_number" })
-    .select("id, plate_number");
+    .upsert(rows, { onConflict: "user_id,plate_number,registration_city" })
+    .select("id, plate_number, registration_city");
 
   if (error) throw error;
   return Array.isArray(data) ? data : [];
@@ -364,15 +391,19 @@ async function saveBookingForUser(booking, vehicles) {
   if (!isSupabaseReady()) throw new Error("Supabase not ready");
 
   const plateNumber = normalizePlate(booking.plateNumber);
+  const registrationCity = normalizeRegistrationCity(booking.registrationCity);
   let vehicle = (vehicles || []).find(
-    (item) => normalizePlate(item.plate_number) === plateNumber
+    (item) =>
+      normalizePlate(item.plate_number) === plateNumber &&
+      normalizeRegistrationCity(item.registration_city) === registrationCity
   );
 
   if (!vehicle) {
     const { data, error } = await supabaseClient
       .from("vehicle_registrations")
-      .select("id, plate_number")
+      .select("id, plate_number, registration_city")
       .eq("plate_number", plateNumber)
+      .eq("registration_city", registrationCity)
       .limit(1)
       .maybeSingle();
 
@@ -470,11 +501,17 @@ document.getElementById("btnRegister").addEventListener("click", async function 
 
   const email = (document.getElementById("regEmail").value || "").trim();
   const password = document.getElementById("regPassword").value || "";
-  const plates = [
-    document.getElementById("plate1").value,
-    document.getElementById("plate2").value,
-    document.getElementById("plate3").value,
-  ].map(normalizePlate).filter(Boolean).slice(0, 3);
+  const plates = [1, 2, 3]
+    .map((index) => ({
+      plateNumber: document.getElementById(`plate${index}`).value,
+      registrationCity: document.getElementById(`plate${index}City`).value
+    }))
+    .map((plate) => ({
+      plateNumber: normalizePlate(plate.plateNumber),
+      registrationCity: normalizeRegistrationCity(plate.registrationCity)
+    }))
+    .filter((plate) => plate.plateNumber || plate.registrationCity)
+    .slice(0, 3);
   let booking = null;
 
   if (!email || !password) {
@@ -484,6 +521,11 @@ document.getElementById("btnRegister").addEventListener("click", async function 
 
   if (!plates.length) {
     setMsg("regMsg", "Please enter at least one car plate.", "err");
+    return;
+  }
+
+  if (plates.some((plate) => !plate.plateNumber || !plate.registrationCity)) {
+    setMsg("regMsg", "Please enter both the plate number and city/province for each car.", "err");
     return;
   }
 
