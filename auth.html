@@ -364,6 +364,14 @@ function toggleLoggedInControls(session) {
   document.getElementById("loginPassword").disabled = loggedIn;
 }
 
+function resetLoginForm() {
+  document.getElementById("loginEmail").value = "";
+  document.getElementById("loginPassword").value = "";
+  document.getElementById("existingBookingMsg").textContent = "";
+  document.getElementById("existingVehicle").innerHTML = '<option value="">Select registered car</option>';
+  document.getElementById("existingSlot").innerHTML = '<option value="">Select slot</option>';
+}
+
 function getPendingRegistration(email) {
   try {
     const raw = localStorage.getItem(`ezp_pending_registration_${email}`);
@@ -595,8 +603,6 @@ async function refreshSessionUI() {
     box.className = "msg";
     toggleLoggedInControls(null);
     document.getElementById("existingBookingCard").style.display = "none";
-    document.getElementById("existingVehicle").innerHTML = '<option value="">Select registered car</option>';
-    document.getElementById("existingSlot").innerHTML = '<option value="">Select slot</option>';
   }
 }
 
@@ -729,11 +735,10 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
     setMsg("loginMsg", error.message, "err");
     return;
   }
-  document.getElementById("loginPassword").value = "";
-  setMsg("existingBookingMsg", "", "");
+  resetLoginForm();
+  setActiveTab("login");
   await refreshSessionUI();
   setMsg("loginMsg", "", "");
-  location = "auth.html";
 });
 
 document.getElementById("btnLogin").addEventListener("click", async function () {
