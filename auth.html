@@ -93,6 +93,41 @@
         <button class="btn-ghost" id="btnGoHome" type="button">Go Home</button>
       </div>
       <div id="loginMsg" class="msg"></div>
+
+      <div id="existingBookingCard" class="card" style="margin-top:18px;display:none">
+        <div class="section-title">Add Booking</div>
+        <div class="hint">Already registered? Pick one of your saved cars and create a booking here.</div>
+        <div class="grid">
+          <div class="field">
+            <div class="label">Saved car</div>
+            <select id="existingVehicle">
+              <option value="">Select registered car</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="label">Floor</div>
+            <input id="existingFloorLabel" type="text" value="Floor 2 (Barrier)" readonly>
+          </div>
+          <div class="field">
+            <div class="label">Slot</div>
+            <select id="existingSlot">
+              <option value="">Select slot</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="label">Start time</div>
+            <input id="existingBookingStart" type="datetime-local">
+          </div>
+          <div class="field">
+            <div class="label">End time</div>
+            <input id="existingBookingEnd" type="datetime-local">
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btnAddBooking" type="button">Add booking</button>
+        </div>
+        <div id="existingBookingMsg" class="msg"></div>
+      </div>
     </div>
 
     <!-- REGISTER -->
@@ -195,6 +230,8 @@
 
 <script>
 var supabaseClient = null;
+var existingVehicles = [];
+var reservableSlots = [];
 
 async function initSupabaseClient() {
   if (!window.supabase || typeof window.supabase.createClient !== "function") {
@@ -337,6 +374,111 @@ function setDefaultBookingTimes() {
 
   document.getElementById("bookingStart").value = toLocalInputValue(start);
   document.getElementById("bookingEnd").value = toLocalInputValue(end);
+  document.getElementById("existingBookingStart").value = toLocalInputValue(start);
+  document.getElementById("existingBookingEnd").value = toLocalInputValue(end);
+}
+
+async function loadExistingVehicles() {
+  const { data, error } = await supabaseClient
+    .from("vehicle_registrations")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  existingVehicles = Array.isArray(data) ? data : [];
+}
+
+async function loadReservableSlots() {
+  const { data, error } = await supabaseClient
+    .from("parking_slots")
+    .select("id, code, slot_number, floor_id")
+    .eq("is_reservable", true)
+    .eq("is_active", true)
+    .order("slot_number", { ascending: true });
+
+  if (error) {
+    reservableSlots = [];
+    return;
+  }
+
+  reservableSlots = Array.isArray(data)
+    ? data.filter((slot) => Number(slot.floor_id) === 2)
+    : [];
+}
+
+function vehicleLabel(vehicle) {
+  return vehicle.registration_city
+    ? `${vehicle.plate_number} • ${vehicle.registration_city}`
+    : vehicle.plate_number;
+}
+
+function renderExistingBookingOptions() {
+  const vehicleSelect = document.getElementById("existingVehicle");
+  const slotSelect = document.getElementById("existingSlot");
+
+  vehicleSelect.innerHTML = '<option value="">Select registered car</option>';
+  existingVehicles.forEach((vehicle) => {
+    const option = document.createElement("option");
+    option.value = vehicle.id;
+    option.textContent = vehicleLabel(vehicle);
+    vehicleSelect.appendChild(option);
+  });
+
+  slotSelect.innerHTML = '<option value="">Select slot</option>';
+  reservableSlots.forEach((slot) => {
+    const option = document.createElement("option");
+    option.value = slot.id;
+    option.textContent = slot.code || `Slot ${slot.slot_number}`;
+    slotSelect.appendChild(option);
+  });
+}
+
+async function refreshExistingBookingUI(session) {
+  const card = document.getElementById("existingBookingCard");
+  if (!session || !session.user) {
+    card.style.display = "none";
+    return;
+  }
+
+  try {
+    await loadExistingVehicles();
+    await loadReservableSlots();
+    renderExistingBookingOptions();
+    card.style.display = existingVehicles.length ? "" : "none";
+    setMsg(
+      "existingBookingMsg",
+      existingVehicles.length ? "" : "No registered cars yet. Add a car in Register first.",
+      existingVehicles.length ? "" : "err"
+    );
+  } catch (err) {
+    card.style.display = "none";
+    console.warn("Failed to load existing booking options:", err.message || err);
+  }
+}
+
+async function saveBookingByVehicleId(vehicleId, slotId, startTime, endTime) {
+  const { error } = await supabaseClient.rpc("create_booking", {
+    p_vehicle_id: vehicleId,
+    p_slot_id: Number(slotId),
+    p_start_time: startTime,
+    p_end_time: endTime
+  });
+
+  if (!error) return true;
+
+  const slotRecord = reservableSlots.find((slot) => String(slot.id) === String(slotId));
+  if (!slotRecord) throw error;
+
+  const fallback = await supabaseClient.rpc("create_booking", {
+    p_vehicle_id: vehicleId,
+    p_floor_no: Number(slotRecord.floor_id),
+    p_slot: Number(slotRecord.slot_number),
+    p_start_time: startTime,
+    p_end_time: endTime
+  });
+
+  if (fallback.error) throw fallback.error;
+  return true;
 }
 
 async function refreshSessionUI() {
@@ -357,9 +499,11 @@ async function refreshSessionUI() {
     box.className = "msg ok";
     box.textContent = `Logged in as ${session.user.email}`;
     logoutBtn.style.display = "";
+    await refreshExistingBookingUI(session);
   } else {
     box.style.display = "none";
     logoutBtn.style.display = "none";
+    document.getElementById("existingBookingCard").style.display = "none";
   }
 }
 
@@ -377,13 +521,27 @@ async function saveVehiclesForUser(userId, plates) {
 
   if (!rows.length) return [];
 
-  const { data, error } = await supabaseClient
+  let result = await supabaseClient
     .from("vehicle_registrations")
     .upsert(rows, { onConflict: "user_id,plate_number,registration_city" })
-    .select("id, plate_number, registration_city");
+    .select("*");
 
-  if (error) throw error;
-  return Array.isArray(data) ? data : [];
+  if (result.error) {
+    result = await supabaseClient
+      .from("vehicle_registrations")
+      .upsert(
+        rows.map((row, index) => ({
+          user_id: row.user_id,
+          plate_number: row.plate_number,
+          is_default: index === 0
+        })),
+        { onConflict: "user_id,plate_number" }
+      )
+      .select("*");
+  }
+
+  if (result.error) throw result.error;
+  return Array.isArray(result.data) ? result.data : [];
 }
 
 async function saveBookingForUser(booking, vehicles) {
@@ -415,16 +573,33 @@ async function saveBookingForUser(booking, vehicles) {
     throw new Error("The selected booking car could not be found.");
   }
 
-  const { error } = await supabaseClient.rpc("create_booking", {
-    p_vehicle_id: vehicle.id,
-    p_floor_no: Number(booking.floorNo),
-    p_slot: Number(booking.slot),
-    p_start_time: booking.startTime,
-    p_end_time: booking.endTime
-  });
+  let slotId = booking.slotId || null;
+  if (!slotId) {
+    if (!reservableSlots.length) {
+      await loadReservableSlots();
+    }
+    const matchedSlot = reservableSlots.find(
+      (slot) =>
+        Number(slot.floor_id) === Number(booking.floorNo) &&
+        Number(slot.slot_number) === Number(booking.slot)
+    );
+    slotId = matchedSlot ? matchedSlot.id : null;
+  }
 
-  if (error) throw error;
-  return true;
+  if (!slotId) {
+    const { error } = await supabaseClient.rpc("create_booking", {
+      p_vehicle_id: vehicle.id,
+      p_floor_no: Number(booking.floorNo),
+      p_slot: Number(booking.slot),
+      p_start_time: booking.startTime,
+      p_end_time: booking.endTime
+    });
+
+    if (error) throw error;
+    return true;
+  }
+
+  return saveBookingByVehicleId(vehicle.id, slotId, booking.startTime, booking.endTime);
 }
 
 async function trySavePendingRegistrationAfterLogin(email, userId) {
@@ -489,7 +664,38 @@ document.getElementById("btnLogin").addEventListener("click", async function () 
   }
 
   setMsg("loginMsg", "Login successful.", "ok");
-  location = "home.html";
+});
+
+document.getElementById("btnAddBooking").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("existingBookingMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+
+  const vehicleId = document.getElementById("existingVehicle").value;
+  const slotId = document.getElementById("existingSlot").value;
+  const startValue = document.getElementById("existingBookingStart").value;
+  const endValue = document.getElementById("existingBookingEnd").value;
+
+  if (!vehicleId || !slotId || !startValue || !endValue) {
+    setMsg("existingBookingMsg", "Please choose car, slot, start time, and end time.", "err");
+    return;
+  }
+
+  const startTime = new Date(startValue);
+  const endTime = new Date(endValue);
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+    setMsg("existingBookingMsg", "Please choose a valid booking time range.", "err");
+    return;
+  }
+
+  setMsg("existingBookingMsg", "Saving booking...", "");
+  try {
+    await saveBookingByVehicleId(vehicleId, slotId, startTime.toISOString(), endTime.toISOString());
+    setMsg("existingBookingMsg", "Booking saved successfully.", "ok");
+  } catch (err) {
+    setMsg("existingBookingMsg", err.message || "Booking failed.", "err");
+  }
 });
 
 document.getElementById("btnRegister").addEventListener("click", async function () {
