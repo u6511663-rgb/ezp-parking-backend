@@ -733,6 +733,7 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
   setMsg("existingBookingMsg", "", "");
   await refreshSessionUI();
   setMsg("loginMsg", "", "");
+  location = "auth.html";
 });
 
 document.getElementById("btnLogin").addEventListener("click", async function () {
