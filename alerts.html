@@ -14,6 +14,22 @@
     align-items:flex-start;
     gap:12px;
   }
+  .header-right{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    align-items:flex-end;
+  }
+  .account-link{
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    padding:8px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:800;
+  }
   .alerts-list{
     display:grid;
     gap:12px;
@@ -96,7 +112,9 @@
       <h1>Alerts</h1>
       <div class="small">Your booking alerts and upcoming parking times</div>
     </div>
-    <button class="btn-ghost" type="button" onclick="location='./auth.html'">Account</button>
+    <div class="header-right">
+      <button class="account-link" type="button" onclick="location='./auth.html'">Account</button>
+    </div>
   </div>
 
   <div class="card" style="margin-top:18px">
