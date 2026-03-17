@@ -112,18 +112,18 @@
       <div class="plate-grid">
         <div class="field">
           <div class="label">Plate 1</div>
-          <input id="plate1" type="text" placeholder="ABC-1234">
+          <input id="plate1" type="text" placeholder="กข 1234">
         </div>
         <div class="field">
           <div class="label">Plate 2 (optional)</div>
-          <input id="plate2" type="text" placeholder="ABC-5678">
+          <input id="plate2" type="text" placeholder="1กข 2345">
         </div>
         <div class="field">
           <div class="label">Plate 3 (optional)</div>
-          <input id="plate3" type="text" placeholder="XYZ-9999">
+          <input id="plate3" type="text" placeholder="ขค 3456">
         </div>
       </div>
-      <div class="hint">Cars are saved to the `vehicle_registrations` table and linked to your user.</div>
+      <div class="hint">Thai and English license plates are supported and saved to the `vehicle_registrations` table.</div>
 
       <div class="section-title">Booking (optional)</div>
       <div class="grid">
@@ -224,7 +224,11 @@ function setActiveTab(which) {
 }
 
 function normalizePlate(s) {
-  return (s || "").trim().toUpperCase();
+  return (s || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*-\s*/g, "-")
+    .toUpperCase();
 }
 
 function toLocalInputValue(date) {
