@@ -151,6 +151,7 @@
 
 <script>
 let supabaseClient = null;
+let alertsRefreshTimer = null;
 
 async function initSupabaseClient() {
   const response = await fetch("/api/public-config", {
@@ -224,6 +225,7 @@ function getTimingState(booking) {
 }
 
 async function loadUserBookings(userId) {
+  const nowIso = new Date().toISOString();
   const { data, error } = await supabaseClient
     .from("bookings")
     .select(`
@@ -247,6 +249,8 @@ async function loadUserBookings(userId) {
       )
     `)
     .eq("user_id", userId)
+    .gte("end_time", nowIso)
+    .not("status", "in", "(completed,cancelled,expired)")
     .order("start_time", { ascending: true });
 
   if (error) throw error;
@@ -258,8 +262,8 @@ function renderBookings(bookings) {
   const container = document.getElementById("alertsContainer");
 
   if (!bookings.length) {
-    summary.textContent = "No bookings yet.";
-    container.innerHTML = "<div class='small'>When you book a slot, it will show here.</div>";
+    summary.textContent = "No active alerts.";
+    container.innerHTML = "<div class='small'>When you have an upcoming or active booking, it will show here.</div>";
     return;
   }
 
@@ -341,6 +345,7 @@ async function renderAlertsPage() {
 
 document.addEventListener("DOMContentLoaded", function () {
   renderAlertsPage();
+  alertsRefreshTimer = window.setInterval(renderAlertsPage, 60000);
 });
 </script>
 </body>
