@@ -29,6 +29,24 @@
     outline:none;
   }
   input:focus, select:focus{border-color:rgba(19,181,211,0.65)}
+  select{
+    appearance:none;
+    -webkit-appearance:none;
+    -moz-appearance:none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--text) 50%),
+      linear-gradient(135deg, var(--text) 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) calc(50% - 2px),
+      calc(100% - 12px) calc(50% - 2px);
+    background-size:6px 6px, 6px 6px;
+    background-repeat:no-repeat;
+    padding-right:34px;
+  }
+  select option{
+    background:#0d1628;
+    color:#e6eef8;
+  }
 
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
   .btn-primary{
@@ -151,7 +169,9 @@
         </div>
         <div class="field">
           <div class="label">City / Province 1</div>
-          <input id="plate1City" type="text" placeholder="กรุงเทพมหานคร">
+          <select id="plate1City">
+            <option value="">Select province</option>
+          </select>
         </div>
         <div class="field">
           <div class="label">Plate 2 (optional)</div>
@@ -159,7 +179,9 @@
         </div>
         <div class="field">
           <div class="label">City / Province 2 (optional)</div>
-          <input id="plate2City" type="text" placeholder="เชียงใหม่">
+          <select id="plate2City">
+            <option value="">Select province</option>
+          </select>
         </div>
         <div class="field">
           <div class="label">Plate 3 (optional)</div>
@@ -167,7 +189,9 @@
         </div>
         <div class="field">
           <div class="label">City / Province 3 (optional)</div>
-          <input id="plate3City" type="text" placeholder="ขอนแก่น">
+          <select id="plate3City">
+            <option value="">Select province</option>
+          </select>
         </div>
       </div>
       <div class="hint">Thai and English license plates are supported. For Thai plates, save the city/province shown on the plate too.</div>
@@ -232,6 +256,21 @@
 var supabaseClient = null;
 var existingVehicles = [];
 var reservableSlots = [];
+const THAI_PROVINCES = [
+  "กรุงเทพมหานคร", "กระบี่", "กาญจนบุรี", "กาฬสินธุ์", "กำแพงเพชร", "ขอนแก่น",
+  "จันทบุรี", "ฉะเชิงเทรา", "ชลบุรี", "ชัยนาท", "ชัยภูมิ", "ชุมพร",
+  "เชียงราย", "เชียงใหม่", "ตรัง", "ตราด", "ตาก", "นครนายก",
+  "นครปฐม", "นครพนม", "นครราชสีมา", "นครศรีธรรมราช", "นครสวรรค์", "นนทบุรี",
+  "นราธิวาส", "น่าน", "บึงกาฬ", "บุรีรัมย์", "ปทุมธานี", "ประจวบคีรีขันธ์",
+  "ปราจีนบุรี", "ปัตตานี", "พระนครศรีอยุธยา", "พะเยา", "พังงา", "พัทลุง",
+  "พิจิตร", "พิษณุโลก", "เพชรบุรี", "เพชรบูรณ์", "แพร่", "ภูเก็ต",
+  "มหาสารคาม", "มุกดาหาร", "แม่ฮ่องสอน", "ยะลา", "ยโสธร", "ระนอง",
+  "ระยอง", "ราชบุรี", "ลพบุรี", "ลำปาง", "ลำพูน", "เลย",
+  "ศรีสะเกษ", "สกลนคร", "สงขลา", "สตูล", "สมุทรปราการ", "สมุทรสงคราม",
+  "สมุทรสาคร", "สระแก้ว", "สระบุรี", "สิงห์บุรี", "สุโขทัย", "สุพรรณบุรี",
+  "สุราษฎร์ธานี", "สุรินทร์", "หนองคาย", "หนองบัวลำภู", "อ่างทอง", "อำนาจเจริญ",
+  "อุดรธานี", "อุตรดิตถ์", "อุทัยธานี", "อุบลราชธานี"
+];
 
 async function initSupabaseClient() {
   if (!window.supabase || typeof window.supabase.createClient !== "function") {
@@ -284,6 +323,25 @@ function normalizeRegistrationCity(s) {
   return (s || "")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+function populateProvinceSelect(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  const currentValue = select.value;
+  select.innerHTML = '<option value="">Select province</option>';
+
+  THAI_PROVINCES.forEach((province) => {
+    const option = document.createElement("option");
+    option.value = province;
+    option.textContent = province;
+    select.appendChild(option);
+  });
+
+  if (currentValue) {
+    select.value = currentValue;
+  }
 }
 
 function toLocalInputValue(date) {
@@ -789,6 +847,9 @@ document.getElementById("btnRegister").addEventListener("click", async function 
 document.addEventListener("DOMContentLoaded", async function () {
   // Ensure tab switching works even if Supabase fails to load.
   setActiveTab("login");
+  populateProvinceSelect("plate1City");
+  populateProvinceSelect("plate2City");
+  populateProvinceSelect("plate3City");
 
   try {
     await initSupabaseClient();
