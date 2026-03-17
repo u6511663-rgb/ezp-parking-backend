@@ -149,14 +149,13 @@
 <div class="bottom-nav">
   <button class="nav-btn active" data-page="home" onclick="location='home.html'">Home</button>
   <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
-  <button class="nav-btn" data-page="insights" onclick="location='insighs.html'">Insights</button>
   <button class="nav-btn" data-page="settings" onclick="location='settings.html'">Settings</button>
 </div>
 
 <script>
 const FLOORS = [
-  { id: "GND", name: "Ground Level", subtitle: "Entrance left (Y)" },
-  { id: "UPP", name: "Upper Deck", subtitle: "Above ground" }
+  { id: "F1", name: "1st Floor", subtitle: "3 parking slots" },
+  { id: "F2", name: "2nd Floor", subtitle: "3 parking slots" }
 ];
 
 /* =========================
@@ -164,8 +163,8 @@ const FLOORS = [
 ========================= */
 async function loadFloorStats() {
   const fallback = {
-    GND: { total: 3, occupied: 0, free: 3 },
-    UPP: { total: 3, occupied: 0, free: 3 }
+    F1: { total: 3, occupied: 0, free: 3 },
+    F2: { total: 3, occupied: 0, free: 3 }
   };
 
   const responses = await Promise.all(
@@ -231,7 +230,7 @@ async function renderHome() {
           <div class="sub">${floor.subtitle}</div>
         </div>
         <button class="view-btn"
-          onclick="location='floorhtml-2ndphase.html#${floor.id}'">
+          onclick="location='floor.html#${floor.id}'">
           View
         </button>
       `;
@@ -241,7 +240,7 @@ async function renderHome() {
       detailItem.className = "detail-item";
       detailItem.innerHTML = `
         <div class="detail-left">
-          <div class="badge">${floor.id === "GND" ? "G" : "U"}</div>
+          <div class="badge">${floor.id}</div>
           <div>
             <div style="font-weight:800">${floor.name}</div>
             <div style="color:var(--accent);margin-top:6px">

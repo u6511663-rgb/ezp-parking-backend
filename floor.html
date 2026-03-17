@@ -123,8 +123,10 @@
   /* row of slots */
   .slot-row{
     display:grid;
-    grid-template-columns: repeat(10, minmax(32px,1fr));
+    grid-template-columns: repeat(3, minmax(90px,1fr));
     gap:8px;
+    max-width:420px;
+    margin:0 auto;
   }
   .slot-cell{
     min-height:40px;
@@ -258,13 +260,13 @@
 
   @media(max-width:900px){
     .slot-row{
-      grid-template-columns: repeat(8, minmax(30px,1fr));
+      grid-template-columns: repeat(3, minmax(80px,1fr));
     }
   }
   @media(max-width:720px){
     .wrap{padding:12px}
     .slot-row{
-      grid-template-columns: repeat(6, minmax(28px,1fr));
+      grid-template-columns: repeat(3, minmax(72px,1fr));
     }
     .slot-tile{font-size:10px;min-height:40px}
     .lane-main{height:32px}
@@ -279,7 +281,6 @@
 <div class="bottom-nav">
   <button class="nav-btn" data-page="home" onclick="location='home.html'">Home</button>
   <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
-  <button class="nav-btn" data-page="insights" onclick="location='insights.html'">Insights</button>
   <button class="nav-btn" data-page="settings" onclick="location='settings.html'">Settings</button>
 </div>
 
@@ -291,8 +292,8 @@
     <div class="title" id="pageTitle">Floor</div>
     <div class="subtitle" id="pageSub">—</div>
     <div class="tabs">
-      <button class="floor-tab active" data-level="GND">Ground</button>
-      <button class="floor-tab" data-level="UPP">Upper deck</button>
+      <button class="floor-tab active" data-level="F1">1st Floor</button>
+      <button class="floor-tab" data-level="F2">2nd Floor</button>
     </div>
   </div>
 
@@ -337,32 +338,22 @@ const API = "/api";
    FLOOR ID MAP (DB mapping)
 ========================= */
 const FLOOR_ID_MAP = {
-  GND: 1,
-  UPP: 2
+  F1: 1,
+  F2: 2
 };
 
 /* =========================
    VISUAL LAYOUT DEFINITION
 ========================= */
 const FLOOR_LAYOUT = {
-  GND: {
+  F1: {
     rows: [
-      ['G01','G02','G03','G04','G05','G06','G07','G08','G09','G10'],
-      'lane-small',
-      ['G11','G12','G13','G14','G15','G16','G17','G18','G19','G20'],
-      'lane-main',
-      ['G21','G22','G23','G24','G25','G26','G27','G28','G29','G30'],
-      'lane-small',
-      ['G31','G32','G33','G34','G35','G36','G37','G38','G39','G40']
+      ['F1-S1','F1-S2','F1-S3']
     ]
   },
-  UPP: {
+  F2: {
     rows: [
-      ['U01','U02','U03','U04','U05','U06','U07','U08','U09', null],
-      'lane-small',
-      ['U10','U11','U12','U13','U14','U15','U16','U17','U18', null],
-      'lane-main',
-      [null,'U19','U20','U21','U22', null, null, null, null, null]
+      ['F2-S1','F2-S2','F2-S3']
     ]
   }
 };
@@ -448,29 +439,13 @@ async function renderLayout(level){
     `Free ${free} • Occ ${occ}`;
 
   document.getElementById("pageTitle").textContent =
-    level === "UPP" ? "Upper Deck" : "Ground Level";
+    level === "F2" ? "2nd Floor" : "1st Floor";
 
   const layoutDef = FLOOR_LAYOUT[level];
   const layout = document.getElementById("parkingLayout");
   layout.innerHTML = "";
 
   layoutDef.rows.forEach(rowDef=>{
-
-    if(rowDef === "lane-small"){
-      const d = document.createElement("div");
-      d.className = "lane lane-small";
-      layout.appendChild(d);
-      return;
-    }
-
-    if(rowDef === "lane-main"){
-      const d = document.createElement("div");
-      d.className = "lane lane-main";
-      d.innerHTML = "<span>Main drive lane</span>";
-      layout.appendChild(d);
-      return;
-    }
-
     const row = document.createElement("div");
     row.className = "slot-row";
 
@@ -512,13 +487,21 @@ document.addEventListener("DOMContentLoaded", ()=>{
       window.location.href = "/";
     });
 
-  renderLayout("GND");
+  const hashLevel = (window.location.hash || "").replace("#", "").toUpperCase();
+  const initialLevel = hashLevel === "F2" ? "F2" : "F1";
+
+  document.querySelectorAll(".floor-tab")
+    .forEach(btn=>{
+      btn.classList.toggle("active", btn.dataset.level === initialLevel);
+    });
+
+  renderLayout(initialLevel);
 
   // Auto refresh
   setInterval(()=>{
     const active =
       document.querySelector(".floor-tab.active")
-      ?.dataset.level || "GND";
+      ?.dataset.level || "F1";
 
     renderLayout(active);
   },3000);
