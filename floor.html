@@ -145,10 +145,10 @@
     background:linear-gradient(180deg, rgba(12,18,30,0.96), rgba(7,12,22,0.96));
     font-size:12px;
     font-weight:800;
-    cursor:pointer;
+    cursor:default;
     min-height:72px;
     position:relative;
-    transition:transform .12s, box-shadow .12s, border-color .12s, background .12s;
+    transition:box-shadow .12s, border-color .12s, background .12s;
   }
   .slot-tile.free{
     border-color:rgba(18,211,144,0.75);
@@ -162,8 +162,7 @@
     box-shadow:0 0 0 1px rgba(255,91,91,0.12), inset 0 0 18px rgba(255,91,91,0.08);
   }
   .slot-tile:hover{
-    transform:translateY(-1px);
-    box-shadow:0 4px 18px rgba(0,0,0,0.5);
+    box-shadow:none;
   }
   .slot-code{
     margin-bottom:6px;
@@ -327,17 +326,6 @@ async function loadSlots(floorId){
 }
 
 /* =========================
-   UPDATE SLOT STATUS
-========================= */
-async function updateSlot(slotId, newStatus){
-  await fetch(`${API}/slots/${slotId}/status`,{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ status:newStatus })
-  });
-}
-
-/* =========================
    CREATE SLOT TILE
 ========================= */
 function createSlotEl(slot){
@@ -352,23 +340,6 @@ function createSlotEl(slot){
     <div class="slot-code">${slot.displayCode || slot.code}</div>
     <div class="slot-car">🚗</div>
   `;
-
-  /* ===== TOGGLE STATUS ===== */
-  el.addEventListener("click", async ()=>{
-
-    const newStatus =
-      slot.status === "free"
-      ? "occupied"
-      : "free";
-
-    // Optimistic UI
-    el.classList.remove("free","occupied");
-    el.classList.add(newStatus);
-
-    slot.status = newStatus;
-
-    await updateSlot(slot.id, newStatus);
-  });
 
   return el;
 }
