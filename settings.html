@@ -3,122 +3,488 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>EZP — Settings</title>
+<title>EZP - Settings</title>
 <link rel="stylesheet" href="common.css">
 <style>
-  /* extra styles specific to the settings page */
-  .section { margin-top:16px; border-radius:12px; padding:14px; background:var(--panel); border:1px solid rgba(255,255,255,0.02) }
-  .option-list { display:flex; flex-direction:column; gap:10px; margin-top:8px }
-  .option { padding:12px 14px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); display:flex; align-items:center; gap:12px; cursor:pointer; border:1px solid rgba(255,255,255,0.02) }
-  .option .icon { width:36px; height:36px; border-radius:8px; display:grid; place-items:center; background:rgba(255,255,255,0.02) }
-  .option .lbl { font-weight:700 }
-  .option.small { padding:10px }
-  .radio-dot { margin-left:auto; width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.08); display:inline-block; background:transparent; box-sizing:border-box }
-  .radio-dot.active { background:var(--accent); border-color:var(--accent) }
-  .accent-row { display:flex; gap:12px; margin-top:12px; align-items:center }
-  .accent-tile { width:64px; height:64px; border-radius:10px; display:grid; place-items:center; cursor:pointer; border:2px solid rgba(255,255,255,0.04) }
-  .accent-tile.selected { box-shadow:0 8px 24px rgba(2,6,12,0.6); border-color:rgba(255,255,255,0.12); outline:3px solid rgba(255,255,255,0.03) }
-  .accent-circle { width:36px; height:36px; border-radius:50% }
-  .conn-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03) }
-  .about-grid { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:8px; align-items:center }
-  .about-grid div { color:var(--muted) }
-  .about-grid .val { color:inherit; font-weight:700; text-align:right }
-  @media (max-width:900px){ .accent-row { flex-wrap:wrap } }
+  .container{max-width:1100px;margin:20px auto;padding:20px}
+  .top-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:18px;
+  }
+  .app-title{font-size:26px;font-weight:800}
+  .app-sub{color:var(--muted);margin-top:6px}
+  .header-right{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    align-items:flex-end;
+  }
+  .account-link{
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    padding:8px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:800;
+  }
+  .online-pill{
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid var(--panel-border);
+    background:rgba(0,0,0,0.2);
+    color:var(--accent);
+    font-size:13px;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns:1.2fr .8fr;
+    gap:16px;
+  }
+  .hero-card,
+  .settings-card{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    padding:18px;
+  }
+  .hero-card h2,
+  .settings-card h2{
+    margin:0;
+    font-size:18px;
+  }
+  .hero-card .small,
+  .settings-card .small{
+    margin-top:6px;
+  }
+  .hero-list{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+    margin-top:16px;
+  }
+  .hero-item{
+    background:rgba(255,255,255,0.02);
+    border-radius:14px;
+    padding:14px;
+  }
+  .hero-value{
+    font-size:22px;
+    font-weight:800;
+    margin-top:8px;
+  }
+  .section-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:18px;
+  }
+  .setting-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:14px;
+    padding:14px 0;
+    border-top:1px solid rgba(255,255,255,0.05);
+  }
+  .setting-row:first-of-type{
+    border-top:0;
+    padding-top:0;
+  }
+  .setting-copy{
+    flex:1;
+  }
+  .setting-title{
+    font-weight:800;
+    margin-bottom:4px;
+  }
+  .setting-value{
+    min-width:180px;
+    text-align:right;
+  }
+  .setting-value select{
+    width:100%;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.02);
+    color:var(--text);
+  }
+  .toggle{
+    width:54px;
+    height:30px;
+    border-radius:999px;
+    background:rgba(255,255,255,0.08);
+    position:relative;
+    cursor:pointer;
+    border:1px solid rgba(255,255,255,0.06);
+    transition:background .2s ease;
+  }
+  .toggle::after{
+    content:"";
+    position:absolute;
+    top:3px;
+    left:3px;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background:#fff;
+    transition:left .2s ease;
+  }
+  .toggle.on{
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  }
+  .toggle.on::after{
+    left:27px;
+  }
+  .action-list{
+    display:grid;
+    gap:12px;
+    margin-top:16px;
+  }
+  .action-btn{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    width:100%;
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.02);
+    color:var(--text);
+    border-radius:14px;
+    padding:14px 16px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .status-list{
+    display:grid;
+    gap:12px;
+    margin-top:16px;
+  }
+  .status-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    background:rgba(255,255,255,0.02);
+    border-radius:14px;
+    padding:14px 16px;
+  }
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,0.08);
+    background:rgba(255,255,255,0.03);
+  }
+  .status-dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:var(--accent);
+  }
+  .page-msg{
+    margin-top:16px;
+    color:var(--accent);
+  }
+  @media (max-width:900px){
+    .hero-grid,
+    .section-grid{
+      grid-template-columns:1fr;
+    }
+    .top-header{
+      flex-direction:column;
+      gap:12px;
+    }
+    .header-right{
+      align-items:flex-start;
+    }
+    .hero-list{
+      grid-template-columns:1fr;
+    }
+    .setting-row{
+      flex-direction:column;
+      align-items:flex-start;
+    }
+    .setting-value{
+      width:100%;
+      min-width:0;
+      text-align:left;
+    }
+  }
 </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div>
-        <h1>Settings</h1>
-        <div class="small">Customize your experience</div>
-      </div>
-      <div style="text-align:right">
-        <div class="small card" style="display:inline-block">Online • ~2s updates</div>
-      </div>
-    </header>
 
-    <!-- Appearance -->
-    <div class="section">
-      <div style="font-weight:700">Appearance</div>
-      <div class="option-list" id="appearanceList">
-        <div class="option option-light" data-mode="system">
-          <div class="icon">🖥️</div>
-          <div>
-            <div class="lbl">System</div>
-            <div class="small">Follow device theme</div>
-          </div>
-          <div class="radio-dot" data-mode="system"></div>
-        </div>
-
-        <div class="option option-light" data-mode="light">
-          <div class="icon">🌞</div>
-          <div>
-            <div class="lbl">Light</div>
-            <div class="small">Use light appearance</div>
-          </div>
-          <div class="radio-dot" data-mode="light"></div>
-        </div>
-
-        <div class="option option-dark" data-mode="dark">
-          <div class="icon">🌙</div>
-          <div>
-            <div class="lbl">Dark</div>
-            <div class="small">Use dark appearance</div>
-          </div>
-          <div class="radio-dot" data-mode="dark"></div>
-        </div>
-      </div>
+<div class="container">
+  <div class="top-header">
+    <div>
+      <div class="app-title">Settings</div>
+      <div class="app-sub">Booking reminders, parking preferences, and system shortcuts</div>
     </div>
-
-    <!-- Accent color -->
-    <div class="section" style="margin-top:12px">
-      <div style="font-weight:700">Accent Color</div>
-      <div class="small" style="margin-top:8px">Pick a color that fits your style</div>
-      <div class="accent-row" id="accentRow">
-        <div class="accent-tile" data-color="#2f63ff" title="EZP Blue">
-          <div class="accent-circle" style="background:#2f63ff"></div>
-        </div>
-        <div class="accent-tile" data-color="#13b5d3" title="Teal">
-          <div class="accent-circle" style="background:#13b5d3"></div>
-        </div>
-        <div class="accent-tile" data-color="#f0a500" title="Amber">
-          <div class="accent-circle" style="background:#f0a500"></div>
-        </div>
-      </div>
+    <div class="header-right">
+      <button class="account-link" type="button" onclick="location='auth.html'">Account</button>
+      <div class="online-pill">● Online • Preferences ready</div>
     </div>
-
-    <!-- Connection -->
-    <div class="section" style="margin-top:12px">
-      <div style="font-weight:700">Connection</div>
-      <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center">
-        <div>
-          <div class="small">Real-time updates</div>
-          <div class="small">Live parking availability</div>
-        </div>
-        <div class="conn-chip" id="connChip">
-          <span style="width:12px;height:12px;border-radius:50%;display:inline-block;background:var(--accent)"></span>
-          <div class="small" id="connStatus">Online • ~2 s updates</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- About -->
-    <div class="section" style="margin-top:12px">
-      <div style="font-weight:700">About</div>
-      <div class="about-grid">
-        <div class="small">Version</div><div class="val">1.0.0</div>
-        <div class="small">Build</div><div class="val">2025.10.15</div>
-        <div class="small">IoT Sensors</div><div class="val" id="iotStatus" style="color:var(--accent)">Active</div>
-      </div>
-    </div>
-
-    <div style="height:72px"></div>
   </div>
 
-  <!-- bottom nav -->
-  <div class="bottom-nav">
-    <button class="nav-btn" data-page="home" onclick="location='home.html'">Home</button>
-    <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
-    <button class="nav-btn active" data-page="settings.html">Settings</button>
+  <div class="hero-grid">
+    <div class="hero-card">
+      <h2>Parking Preferences</h2>
+      <div class="small">These settings help your users understand how the smart parking system behaves.</div>
+      <div class="hero-list">
+        <div class="hero-item">
+          <div class="small">Barrier Booking Floor</div>
+          <div class="hero-value">Floor 2</div>
+        </div>
+        <div class="hero-item">
+          <div class="small">Slots Per Floor</div>
+          <div class="hero-value">3 Slots</div>
+        </div>
+        <div class="hero-item">
+          <div class="small">Reminder Window</div>
+          <div class="hero-value" id="heroReminderValue">10 Min</div>
+        </div>
+        <div class="hero-item">
+          <div class="small">Plate Matching</div>
+          <div class="hero-value">Thai + City</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h2>Quick Actions</h2>
+      <div class="small">Shortcuts for the pages your users will use most.</div>
+      <div class="action-list">
+        <button class="action-btn" type="button" onclick="location='auth.html'">
+          <span>
+            <strong>Manage account</strong><br>
+            <span class="small">Login, register a car, or add a booking</span>
+          </span>
+          <span>→</span>
+        </button>
+        <button class="action-btn" type="button" onclick="location='alerts.html'">
+          <span>
+            <strong>View booking alerts</strong><br>
+            <span class="small">See upcoming and active bookings</span>
+          </span>
+          <span>→</span>
+        </button>
+        <button class="action-btn" type="button" onclick="location='floor.html#F2'">
+          <span>
+            <strong>Open barrier floor</strong><br>
+            <span class="small">Check live slot blocks on Floor 2</span>
+          </span>
+          <span>→</span>
+        </button>
+      </div>
+    </div>
   </div>
+
+  <div class="section-grid">
+    <div class="settings-card">
+      <h2>Booking Alerts</h2>
+      <div class="small">Control how close to the booking time the warning should appear.</div>
+
+      <div class="setting-row">
+        <div class="setting-copy">
+          <div class="setting-title">Upcoming booking reminder</div>
+          <div class="small">Show a warning before the reservation start time.</div>
+        </div>
+        <div class="toggle on" id="bookingReminderToggle" role="switch" aria-checked="true"></div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-copy">
+          <div class="setting-title">Reminder time</div>
+          <div class="small">Choose how many minutes before the booking starts.</div>
+        </div>
+        <div class="setting-value">
+          <select id="reminderMinutes">
+            <option value="5">5 minutes</option>
+            <option value="10" selected>10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-copy">
+          <div class="setting-title">Browser notification</div>
+          <div class="small">Allow popup alerts when the page is open.</div>
+        </div>
+        <div class="toggle" id="browserNotificationToggle" role="switch" aria-checked="false"></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h2>System Behavior</h2>
+      <div class="small">Useful notes for your parking project and demo.</div>
+
+      <div class="setting-row">
+        <div class="setting-copy">
+          <div class="setting-title">Barrier gate check</div>
+          <div class="small">Open only if plate, city, and booking time match on Floor 2.</div>
+        </div>
+        <div class="status-pill"><span class="status-dot"></span> Enabled</div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-copy">
+          <div class="setting-title">Sensor slot history</div>
+          <div class="small">Keep old sensor rows and show the newest status in the UI.</div>
+        </div>
+        <div class="status-pill"><span class="status-dot"></span> Enabled</div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-copy">
+          <div class="setting-title">Preferred floor view</div>
+          <div class="small">Pick which floor opens first from the settings page.</div>
+        </div>
+        <div class="setting-value">
+          <select id="preferredFloor">
+            <option value="F1">1st Floor</option>
+            <option value="F2" selected>2nd Floor</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-grid">
+    <div class="settings-card">
+      <h2>System Status</h2>
+      <div class="small">A quick summary for your parking demo setup.</div>
+      <div class="status-list">
+        <div class="status-item">
+          <div>
+            <strong>Supabase</strong>
+            <div class="small">Database, auth, and booking data</div>
+          </div>
+          <div class="status-pill"><span class="status-dot"></span> Connected</div>
+        </div>
+        <div class="status-item">
+          <div>
+            <strong>Floor 1 Sensors</strong>
+            <div class="small">Shows history and latest slot state</div>
+          </div>
+          <div class="status-pill"><span class="status-dot"></span> Ready</div>
+        </div>
+        <div class="status-item">
+          <div>
+            <strong>Barrier Camera</strong>
+            <div class="small">Plate check for Floor 2 booking access</div>
+          </div>
+          <div class="status-pill"><span class="status-dot"></span> Ready</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h2>About This App</h2>
+      <div class="small">A simple explanation of what the system does.</div>
+      <div class="status-list">
+        <div class="status-item">
+          <div>
+            <strong>Smart parking view</strong>
+            <div class="small">Home and Floor pages show live 3-slot status on both floors.</div>
+          </div>
+        </div>
+        <div class="status-item">
+          <div>
+            <strong>Car registration</strong>
+            <div class="small">Users register Thai plates and city/province in the Account page.</div>
+          </div>
+        </div>
+        <div class="status-item">
+          <div>
+            <strong>Booking alerts</strong>
+            <div class="small">Alerts page lists booked slots and upcoming parking times.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsMsg" class="page-msg"></div>
+  <div style="height:72px"></div>
+</div>
+
+<div class="bottom-nav">
+  <button class="nav-btn" data-page="home" onclick="location='home.html'">Home</button>
+  <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
+  <button class="nav-btn active" data-page="settings.html">Settings</button>
+</div>
+
+<script>
+  const STORAGE = {
+    reminderEnabled: "ezp_settings_booking_reminder_enabled",
+    reminderMinutes: "ezp_settings_booking_reminder_minutes",
+    browserNotification: "ezp_settings_browser_notification",
+    preferredFloor: "ezp_settings_preferred_floor"
+  };
+
+  function setMessage(text) {
+    document.getElementById("settingsMsg").textContent = text || "";
+  }
+
+  function setToggleState(el, on) {
+    el.classList.toggle("on", !!on);
+    el.setAttribute("aria-checked", on ? "true" : "false");
+  }
+
+  function loadSettings() {
+    const reminderEnabled = localStorage.getItem(STORAGE.reminderEnabled);
+    const reminderMinutes = localStorage.getItem(STORAGE.reminderMinutes) || "10";
+    const browserNotification = localStorage.getItem(STORAGE.browserNotification);
+    const preferredFloor = localStorage.getItem(STORAGE.preferredFloor) || "F2";
+
+    setToggleState(document.getElementById("bookingReminderToggle"), reminderEnabled !== "false");
+    setToggleState(document.getElementById("browserNotificationToggle"), browserNotification === "true");
+    document.getElementById("reminderMinutes").value = reminderMinutes;
+    document.getElementById("preferredFloor").value = preferredFloor;
+    document.getElementById("heroReminderValue").textContent = `${reminderMinutes} Min`;
+  }
+
+  function saveSettings() {
+    const reminderEnabled = document.getElementById("bookingReminderToggle").classList.contains("on");
+    const reminderMinutes = document.getElementById("reminderMinutes").value;
+    const browserNotification = document.getElementById("browserNotificationToggle").classList.contains("on");
+    const preferredFloor = document.getElementById("preferredFloor").value;
+
+    localStorage.setItem(STORAGE.reminderEnabled, reminderEnabled ? "true" : "false");
+    localStorage.setItem(STORAGE.reminderMinutes, reminderMinutes);
+    localStorage.setItem(STORAGE.browserNotification, browserNotification ? "true" : "false");
+    localStorage.setItem(STORAGE.preferredFloor, preferredFloor);
+
+    document.getElementById("heroReminderValue").textContent = `${reminderMinutes} Min`;
+    setMessage("Settings saved.");
+  }
+
+  function bindToggle(id) {
+    const el = document.getElementById(id);
+    el.addEventListener("click", function () {
+      const next = !el.classList.contains("on");
+      setToggleState(el, next);
+      saveSettings();
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    loadSettings();
+    bindToggle("bookingReminderToggle");
+    bindToggle("browserNotificationToggle");
+
+    document.getElementById("reminderMinutes").addEventListener("change", saveSettings);
+    document.getElementById("preferredFloor").addEventListener("change", saveSettings);
+  });
+</script>
+</body>
+</html>
