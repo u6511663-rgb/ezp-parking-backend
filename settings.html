@@ -112,6 +112,26 @@
     border:1px solid var(--panel-border);
     background:rgba(255,255,255,0.02);
     color:var(--text);
+    outline:none;
+    appearance:none;
+    -webkit-appearance:none;
+    -moz-appearance:none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--text) 50%),
+      linear-gradient(135deg, var(--text) 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) calc(50% - 2px),
+      calc(100% - 12px) calc(50% - 2px);
+    background-size:6px 6px, 6px 6px;
+    background-repeat:no-repeat;
+    padding-right:34px;
+  }
+  .setting-value select:focus{
+    border-color:rgba(19,181,211,0.65);
+  }
+  .setting-value select option{
+    background:#0d1628;
+    color:#e6eef8;
   }
   .toggle{
     width:54px;
@@ -158,6 +178,12 @@
     padding:14px 16px;
     cursor:pointer;
     text-align:left;
+    transition:border-color .2s ease, transform .2s ease, background .2s ease;
+  }
+  .action-btn:hover{
+    border-color:rgba(19,181,211,0.28);
+    background:rgba(255,255,255,0.03);
+    transform:translateY(-1px);
   }
   .status-list{
     display:grid;
@@ -191,6 +217,10 @@
   .page-msg{
     margin-top:16px;
     color:var(--accent);
+  }
+  .settings-card,
+  .hero-card{
+    box-shadow:0 12px 30px rgba(1,6,9,0.18);
   }
   @media (max-width:900px){
     .hero-grid,
