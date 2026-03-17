@@ -591,8 +591,12 @@ async function refreshSessionUI() {
     await refreshExistingBookingUI(session);
   } else {
     box.style.display = "none";
+    box.textContent = "";
+    box.className = "msg";
     toggleLoggedInControls(null);
     document.getElementById("existingBookingCard").style.display = "none";
+    document.getElementById("existingVehicle").innerHTML = '<option value="">Select registered car</option>';
+    document.getElementById("existingSlot").innerHTML = '<option value="">Select slot</option>';
   }
 }
 
@@ -725,9 +729,10 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
     setMsg("loginMsg", error.message, "err");
     return;
   }
+  document.getElementById("loginPassword").value = "";
   setMsg("existingBookingMsg", "", "");
   await refreshSessionUI();
-  setMsg("loginMsg", "Logged out.", "ok");
+  setMsg("loginMsg", "", "");
 });
 
 document.getElementById("btnLogin").addEventListener("click", async function () {
