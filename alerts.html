@@ -8,17 +8,28 @@
 <link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  .alerts-header{
+  .container{max-width:1100px;margin:20px auto;padding:20px}
+  .top-header{
     display:flex;
     justify-content:space-between;
     align-items:flex-start;
-    gap:12px;
+    margin-bottom:18px;
   }
+  .app-title{font-size:26px;font-weight:800}
+  .app-sub{color:var(--muted);margin-top:6px}
   .header-right{
     display:flex;
     flex-direction:column;
     gap:10px;
     align-items:flex-end;
+  }
+  .online-pill{
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid var(--panel-border);
+    background:rgba(0,0,0,0.2);
+    color:var(--accent);
+    font-size:13px;
   }
   .account-link{
     border:1px solid var(--panel-border);
@@ -98,6 +109,13 @@
     margin-top:16px;
   }
   @media (max-width:720px){
+    .top-header{
+      flex-direction:column;
+      gap:12px;
+    }
+    .header-right{
+      align-items:flex-start;
+    }
     .booking-grid{
       grid-template-columns:1fr;
     }
@@ -107,13 +125,14 @@
 <body>
 
 <div class="container">
-  <div class="alerts-header">
+  <div class="top-header">
     <div>
-      <h1>Alerts</h1>
-      <div class="small">Your booking alerts and upcoming parking times</div>
+      <div class="app-title">Alerts</div>
+      <div class="app-sub">Your booking alerts and upcoming parking times</div>
     </div>
     <div class="header-right">
       <button class="account-link" type="button" onclick="location='./auth.html'">Account</button>
+      <div class="online-pill">● Online • Booking sync ready</div>
     </div>
   </div>
 
