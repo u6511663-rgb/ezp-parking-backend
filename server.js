@@ -15,16 +15,38 @@ loadEnvFile(path.join(__dirname, ".env"));
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from root and public folder
-app.use(express.static(__dirname));
-app.use('/public', express.static(path.join(__dirname, 'public')));
 
-// Explicit routes for static files
-app.get('/common.css', (req, res) => {
-  res.sendFile(path.join(__dirname, 'common.css'));
+// Serve static files from root
+app.use(express.static(__dirname));
+
+// Explicit routes for HTML pages
+app.get("/home.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "home.html"));
 });
-app.get('/booking-reminders.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'booking-reminders.js'));
+
+app.get("/auth.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "auth.html"));
+});
+
+app.get("/floor.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "floor.html"));
+});
+
+app.get("/guest-status.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "guest-status.html"));
+});
+
+app.get("/settings.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "settings.html"));
+});
+
+// Explicit routes for static assets
+app.get("/common.css", (req, res) => {
+  res.sendFile(path.join(__dirname, "common.css"));
+});
+
+app.get("/booking-reminders.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "booking-reminders.js"));
 });
 
 app.use((req, res, next) => {
