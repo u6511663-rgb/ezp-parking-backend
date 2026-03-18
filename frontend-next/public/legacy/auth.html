@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — Account</title>
+
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  .wrap{max-width:1100px;margin:20px auto;padding:20px}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:18px}
+  .title{font-weight:800;font-size:26px;margin:0}
+  .section-shell{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    padding:20px;
+  }
+  .tabs{margin-top:0;display:inline-flex;padding:4px;border-radius:999px;background:rgba(255,255,255,0.04)}
+  .tab{border:0;background:transparent;color:var(--muted);padding:9px 18px;border-radius:999px;font-size:13px;cursor:pointer;font-weight:700}
+  .tab.active{background:var(--panel);color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,0.45)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .field{display:flex;flex-direction:column;gap:8px}
+  .label{font-size:13px;color:var(--muted)}
+  input, select{
+    width:100%;
+    padding:12px 12px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.01);
+    color:var(--text);
+    outline:none;
+  }
+  input:focus, select:focus{border-color:rgba(19,181,211,0.65)}
+  select{
+    appearance:none;
+    -webkit-appearance:none;
+    -moz-appearance:none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--text) 50%),
+      linear-gradient(135deg, var(--text) 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) calc(50% - 2px),
+      calc(100% - 12px) calc(50% - 2px);
+    background-size:6px 6px, 6px 6px;
+    background-repeat:no-repeat;
+    padding-right:34px;
+  }
+  select option{
+    background:#0d1628;
+    color:#e6eef8;
+  }
+
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  .btn-primary{
+    padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    color:#021019;font-weight:800;cursor:pointer
+  }
+  .btn-ghost{
+    padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);
+    background:transparent;color:var(--text);cursor:pointer
+  }
+  .msg{margin-top:12px;font-size:13px;color:var(--muted)}
+  .msg.err{color:var(--danger)}
+  .msg.ok{color:var(--accent)}
+  .msg.warn{
+    color:#ffd27a;
+  }
+  .booking-alert{
+    display:none;
+    margin-top:14px;
+    padding:14px 16px;
+    border-radius:14px;
+    border:1px solid rgba(255,210,122,0.26);
+    background:linear-gradient(180deg, rgba(255,210,122,0.14), rgba(255,210,122,0.08));
+    color:#fff1cb;
+  }
+  .booking-alert.show{
+    display:block;
+  }
+  .booking-alert-title{
+    font-weight:800;
+    margin-bottom:6px;
+  }
+
+  .section-title{margin-top:10px;font-weight:800}
+  .plate-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .top > div:first-child .small{color:var(--muted);margin-top:6px}
+  .top > div:last-child{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+  .top > div:last-child .card{
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid var(--panel-border);
+    background:rgba(0,0,0,0.2);
+    color:var(--accent);
+  }
+  .tabs + .card{
+    margin-top:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    padding:20px;
+  }
+  #existingBookingCard{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+  }
+
+  @media (max-width:900px){
+    .grid{grid-template-columns:1fr}
+    .top{flex-direction:column}
+    .top > div:last-child{align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1 class="title">Account</h1>
+      <div class="small">Supabase Auth • email + password</div>
+    </div>
+    <div style="text-align:right">
+      <div class="small card" style="display:inline-block">Online • Auth ready</div>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Account tabs">
+    <button class="tab active" id="tabLogin" type="button">Login</button>
+    <button class="tab" id="tabRegister" type="button">Register</button>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div id="sessionBox" class="msg" style="display:none"></div>
+    <div id="bookingReminderBox" class="booking-alert">
+      <div class="booking-alert-title">Upcoming booking</div>
+      <div id="bookingReminderText" class="small"></div>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="panelLogin">
+      <div class="grid">
+        <div class="field">
+          <div class="label">Email</div>
+          <input id="loginEmail" type="email" placeholder="name@email.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <div class="label">Password</div>
+          <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="btn-primary" id="btnLogin" type="button">Login</button>
+        <button class="btn-ghost" id="btnLogout" type="button" style="display:none">Logout</button>
+        <button class="btn-ghost" id="btnGoHome" type="button">Go Home</button>
+      </div>
+      <div id="loginMsg" class="msg"></div>
+
+      <div id="manageAccountCard" class="card" style="margin-top:18px;display:none">
+        <div class="section-title">Manage Account</div>
+        <div class="hint">Change your password and update your saved car registrations.</div>
+
+        <div class="grid">
+          <div class="field">
+            <div class="label">New password</div>
+            <input id="newPassword" type="password" placeholder="Enter a new password" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <div class="label">Confirm new password</div>
+            <input id="confirmPassword" type="password" placeholder="Confirm your new password" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btnChangePassword" type="button">Change password</button>
+        </div>
+        <div id="passwordMsg" class="msg"></div>
+
+        <div class="section-title">Update Car Registrations</div>
+        <div class="hint">You can update up to 3 cars here. Existing bookings keep their old booking records.</div>
+        <div class="plate-grid">
+          <div class="field">
+            <div class="label">Car 1 plate</div>
+            <input id="managePlate1" type="text" placeholder="กข 1234">
+          </div>
+          <div class="field">
+            <div class="label">Car 1 city / province</div>
+            <select id="managePlate1City">
+              <option value="">Select province</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="label">Car 2 plate</div>
+            <input id="managePlate2" type="text" placeholder="1กข 2345">
+          </div>
+          <div class="field">
+            <div class="label">Car 2 city / province</div>
+            <select id="managePlate2City">
+              <option value="">Select province</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="label">Car 3 plate</div>
+            <input id="managePlate3" type="text" placeholder="ขค 3456">
+          </div>
+          <div class="field">
+            <div class="label">Car 3 city / province</div>
+            <select id="managePlate3City">
+              <option value="">Select province</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btnSaveCars" type="button">Save cars</button>
+        </div>
+        <div id="manageCarsMsg" class="msg"></div>
+      </div>
+
+      <div id="existingBookingCard" class="card" style="margin-top:18px;display:none">
+        <div class="section-title">Add Booking</div>
+        <div class="hint">Already registered? Pick one of your saved cars and create a booking here.</div>
+        <div class="grid">
+          <div class="field">
+            <div class="label">Saved car</div>
+            <select id="existingVehicle">
+              <option value="">Select registered car</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="label">Floor</div>
+            <input id="existingFloorLabel" type="text" value="Floor 2 (Barrier)" readonly>
+          </div>
+          <div class="field">
+            <div class="label">Slot</div>
+            <select id="existingSlot">
+              <option value="">Select slot</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="label">Start time</div>
+            <input id="existingBookingStart" type="datetime-local">
+          </div>
+          <div class="field">
+            <div class="label">End time</div>
+            <input id="existingBookingEnd" type="datetime-local">
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btnAddBooking" type="button">Add booking</button>
+        </div>
+        <div id="existingBookingMsg" class="msg"></div>
+      </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="panelRegister" style="display:none">
+      <div class="grid">
+        <div class="field">
+          <div class="label">Email</div>
+          <input id="regEmail" type="email" placeholder="name@email.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <div class="label">Password</div>
+          <input id="regPassword" type="password" placeholder="Choose a password" autocomplete="new-password">
+        </div>
+      </div>
+
+      <div class="section-title">Plate numbers (up to 3)</div>
+      <div class="plate-grid">
+        <div class="field">
+          <div class="label">Plate 1</div>
+          <input id="plate1" type="text" placeholder="กข 1234">
+        </div>
+        <div class="field">
+          <div class="label">City / Province 1</div>
+          <select id="plate1City">
+            <option value="">Select province</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="label">Plate 2 (optional)</div>
+          <input id="plate2" type="text" placeholder="1กข 2345">
+        </div>
+        <div class="field">
+          <div class="label">City / Province 2 (optional)</div>
+          <select id="plate2City">
+            <option value="">Select province</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="label">Plate 3 (optional)</div>
+          <input id="plate3" type="text" placeholder="ขค 3456">
+        </div>
+        <div class="field">
+          <div class="label">City / Province 3 (optional)</div>
+          <select id="plate3City">
+            <option value="">Select province</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">Thai and English license plates are supported. For Thai plates, save the city/province shown on the plate too.</div>
+
+      <div class="section-title">Booking (optional)</div>
+      <div class="grid">
+        <div class="field">
+          <div class="label">Car for booking</div>
+          <select id="bookingPlate">
+            <option value="">No booking</option>
+            <option value="1">Use Plate 1</option>
+            <option value="2">Use Plate 2</option>
+            <option value="3">Use Plate 3</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="label">Floor</div>
+          <select id="bookingFloor">
+            <option value="">Select floor</option>
+            <option value="2">Floor 2 (Barrier)</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="label">Slot</div>
+          <select id="bookingSlot">
+            <option value="">Select slot</option>
+            <option value="1">Slot 1</option>
+            <option value="2">Slot 2</option>
+            <option value="3">Slot 3</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="label">Start time</div>
+          <input id="bookingStart" type="datetime-local">
+        </div>
+        <div class="field">
+          <div class="label">End time</div>
+          <input id="bookingEnd" type="datetime-local">
+        </div>
+      </div>
+      <div class="hint">Booking is only for Floor 2 because the barrier is installed there.</div>
+
+      <div class="row">
+        <button class="btn-primary" id="btnRegister" type="button">Create account</button>
+        <button class="btn-ghost" id="btnGoHome2" type="button">Go Home</button>
+      </div>
+      <div id="regMsg" class="msg"></div>
+    </div>
+  </div>
+
+  <div style="height:72px"></div>
+</div>
+
+<!-- bottom nav -->
+<div class="bottom-nav">
+  <button class="nav-btn" data-page="home" onclick="location='/'">Home</button>
+  <button class="nav-btn" data-page="alerts" onclick="location='/alerts'">Alerts</button>
+  <button class="nav-btn" data-page="settings" onclick="location='/settings'">Settings</button>
+</div>
+
+<script>
+var supabaseClient = null;
+var existingVehicles = [];
+var reservableSlots = [];
+var bookingReminderTimer = null;
+var latestReminderBookingId = null;
+const BOOKING_ALERT_LEAD_MINUTES = 10;
+const THAI_PROVINCES = [
+  "กรุงเทพมหานคร", "กระบี่", "กาญจนบุรี", "กาฬสินธุ์", "กำแพงเพชร", "ขอนแก่น",
+  "จันทบุรี", "ฉะเชิงเทรา", "ชลบุรี", "ชัยนาท", "ชัยภูมิ", "ชุมพร",
+  "เชียงราย", "เชียงใหม่", "ตรัง", "ตราด", "ตาก", "นครนายก",
+  "นครปฐม", "นครพนม", "นครราชสีมา", "นครศรีธรรมราช", "นครสวรรค์", "นนทบุรี",
+  "นราธิวาส", "น่าน", "บึงกาฬ", "บุรีรัมย์", "ปทุมธานี", "ประจวบคีรีขันธ์",
+  "ปราจีนบุรี", "ปัตตานี", "พระนครศรีอยุธยา", "พะเยา", "พังงา", "พัทลุง",
+  "พิจิตร", "พิษณุโลก", "เพชรบุรี", "เพชรบูรณ์", "แพร่", "ภูเก็ต",
+  "มหาสารคาม", "มุกดาหาร", "แม่ฮ่องสอน", "ยะลา", "ยโสธร", "ระนอง",
+  "ระยอง", "ราชบุรี", "ลพบุรี", "ลำปาง", "ลำพูน", "เลย",
+  "ศรีสะเกษ", "สกลนคร", "สงขลา", "สตูล", "สมุทรปราการ", "สมุทรสงคราม",
+  "สมุทรสาคร", "สระแก้ว", "สระบุรี", "สิงห์บุรี", "สุโขทัย", "สุพรรณบุรี",
+  "สุราษฎร์ธานี", "สุรินทร์", "หนองคาย", "หนองบัวลำภู", "อ่างทอง", "อำนาจเจริญ",
+  "อุดรธานี", "อุตรดิตถ์", "อุทัยธานี", "อุบลราชธานี"
+];
+
+async function initSupabaseClient() {
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    console.error("Supabase JS client not loaded. Check the CDN script tag.");
+    return;
+  }
+
+  const response = await fetch("/api/public-config", {
+    headers: { Accept: "application/json" }
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to load public configuration");
+  }
+
+  const config = await response.json();
+  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    throw new Error("Supabase public configuration is incomplete");
+  }
+
+  supabaseClient = window.supabase.createClient(
+    config.supabaseUrl,
+    config.supabaseAnonKey
+  );
+}
+
+function isSupabaseReady() {
+  return !!(supabaseClient && supabaseClient.auth && supabaseClient.from);
+}
+
+function setActiveTab(which) {
+  const isLogin = which === "login";
+  document.getElementById("tabLogin").classList.toggle("active", isLogin);
+  document.getElementById("tabRegister").classList.toggle("active", !isLogin);
+  document.getElementById("panelLogin").style.display = isLogin ? "" : "none";
+  document.getElementById("panelRegister").style.display = isLogin ? "none" : "";
+  document.getElementById("loginMsg").textContent = "";
+  document.getElementById("regMsg").textContent = "";
+}
+
+function normalizePlate(s) {
+  return (s || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*-\s*/g, "-")
+    .toUpperCase();
+}
+
+function normalizeRegistrationCity(s) {
+  return (s || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function populateProvinceSelect(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  const currentValue = select.value;
+  select.innerHTML = '<option value="">Select province</option>';
+
+  THAI_PROVINCES.forEach((province) => {
+    const option = document.createElement("option");
+    option.value = province;
+    option.textContent = province;
+    select.appendChild(option);
+  });
+
+  if (currentValue) {
+    select.value = currentValue;
+  }
+}
+
+function toLocalInputValue(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function setMsg(id, text, kind) {
+  const el = document.getElementById(id);
+  el.classList.remove("err", "ok");
+  if (kind) el.classList.add(kind);
+  el.textContent = text || "";
+}
+
+function toggleLoggedInControls(session) {
+  const loggedIn = !!(session && session.user);
+  document.getElementById("btnLogin").style.display = loggedIn ? "none" : "";
+  document.getElementById("btnLogout").style.display = loggedIn ? "" : "none";
+  document.getElementById("loginEmail").disabled = loggedIn;
+  document.getElementById("loginPassword").disabled = loggedIn;
+}
+
+function resetLoginForm() {
+  document.getElementById("loginEmail").value = "";
+  document.getElementById("loginPassword").value = "";
+  document.getElementById("existingBookingMsg").textContent = "";
+  document.getElementById("existingVehicle").innerHTML = '<option value="">Select registered car</option>';
+  document.getElementById("existingSlot").innerHTML = '<option value="">Select slot</option>';
+}
+
+function resetManageCarsForm() {
+  [1, 2, 3].forEach((index) => {
+    const plateInput = document.getElementById(`managePlate${index}`);
+    const citySelect = document.getElementById(`managePlate${index}City`);
+    if (plateInput) {
+      plateInput.value = "";
+      plateInput.dataset.vehicleId = "";
+    }
+    if (citySelect) {
+      citySelect.value = "";
+      citySelect.dataset.vehicleId = "";
+    }
+  });
+  setMsg("passwordMsg", "", "");
+  setMsg("manageCarsMsg", "", "");
+}
+
+function clearStoredSupabaseSessions() {
+  try {
+    const localKeys = Object.keys(localStorage);
+    localKeys.forEach((key) => {
+      if (key.startsWith("sb-")) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (err) {
+    console.warn("Failed clearing local Supabase session keys:", err.message || err);
+  }
+
+  try {
+    const sessionKeys = Object.keys(sessionStorage);
+    sessionKeys.forEach((key) => {
+      if (key.startsWith("sb-")) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  } catch (err) {
+    console.warn("Failed clearing session Supabase keys:", err.message || err);
+  }
+}
+
+function showLoggedOutView() {
+  resetLoginForm();
+  resetManageCarsForm();
+  setActiveTab("login");
+  toggleLoggedInControls(null);
+  document.getElementById("sessionBox").style.display = "none";
+  document.getElementById("sessionBox").textContent = "";
+  document.getElementById("sessionBox").className = "msg";
+  document.getElementById("manageAccountCard").style.display = "none";
+  document.getElementById("existingBookingCard").style.display = "none";
+  document.getElementById("loginMsg").textContent = "";
+  stopBookingReminderPolling();
+  clearBookingReminderBox();
+}
+
+function getReminderStorageKey(bookingId) {
+  return `ezp_booking_alert_${bookingId}`;
+}
+
+function getSlotLabelById(slotId) {
+  const matched = reservableSlots.find((slot) => String(slot.id) === String(slotId));
+  if (!matched) return `Slot ${slotId}`;
+  return matched.code || `Slot ${matched.slot_number}`;
+}
+
+function getVehicleLabelById(vehicleId) {
+  const matched = existingVehicles.find((vehicle) => String(vehicle.id) === String(vehicleId));
+  return matched ? vehicleLabel(matched) : "your registered car";
+}
+
+function clearBookingReminderBox() {
+  latestReminderBookingId = null;
+  const box = document.getElementById("bookingReminderBox");
+  const text = document.getElementById("bookingReminderText");
+  box.classList.remove("show");
+  text.textContent = "";
+}
+
+function showBookingReminder(booking, minutesAway) {
+  latestReminderBookingId = booking.id;
+  const slotLabel = getSlotLabelById(booking.slot_id);
+  const carLabel = getVehicleLabelById(booking.vehicle_id);
+  const box = document.getElementById("bookingReminderBox");
+  const text = document.getElementById("bookingReminderText");
+  const roundedMinutes = Math.max(0, minutesAway);
+  const timeLabel = roundedMinutes <= 1 ? "less than 1 minute" : `${roundedMinutes} minutes`;
+
+  text.textContent = `${carLabel} is booked for ${slotLabel}. Your booking starts in ${timeLabel}.`;
+  box.classList.add("show");
+}
+
+function notifySoonBooking(booking, minutesAway) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  const alreadySent = localStorage.getItem(getReminderStorageKey(booking.id));
+  if (alreadySent) return;
+
+  const slotLabel = getSlotLabelById(booking.slot_id);
+  const roundedMinutes = Math.max(0, minutesAway);
+  const body = roundedMinutes <= 1
+    ? `${slotLabel} starts very soon.`
+    : `${slotLabel} starts in ${roundedMinutes} minutes.`;
+
+  new Notification("EZP Booking Reminder", {
+    body,
+    tag: `booking-${booking.id}`
+  });
+
+  localStorage.setItem(getReminderStorageKey(booking.id), new Date().toISOString());
+}
+
+async function loadUpcomingBookingsForUser(userId) {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseClient
+    .from("bookings")
+    .select("id, user_id, vehicle_id, slot_id, start_time, end_time, status")
+    .eq("user_id", userId)
+    .gte("end_time", nowIso)
+    .order("start_time", { ascending: true })
+    .limit(10);
+
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function checkUpcomingBookingReminder(session) {
+  if (!session || !session.user) {
+    clearBookingReminderBox();
+    return;
+  }
+
+  try {
+    const bookings = await loadUpcomingBookingsForUser(session.user.id);
+    const now = Date.now();
+
+    const soonBooking = bookings.find((booking) => {
+      if (booking.status && !["booked", "confirmed", "checked_in"].includes(booking.status)) {
+        return false;
+      }
+      const startMs = new Date(booking.start_time).getTime();
+      if (Number.isNaN(startMs)) return false;
+      const diffMinutes = (startMs - now) / 60000;
+      return diffMinutes >= 0 && diffMinutes <= BOOKING_ALERT_LEAD_MINUTES;
+    });
+
+    if (!soonBooking) {
+      clearBookingReminderBox();
+      return;
+    }
+
+    const minutesAway = Math.ceil((new Date(soonBooking.start_time).getTime() - now) / 60000);
+    showBookingReminder(soonBooking, minutesAway);
+    notifySoonBooking(soonBooking, minutesAway);
+  } catch (err) {
+    console.warn("Failed to check booking reminder:", err.message || err);
+  }
+}
+
+function stopBookingReminderPolling() {
+  if (bookingReminderTimer) {
+    clearInterval(bookingReminderTimer);
+    bookingReminderTimer = null;
+  }
+}
+
+async function startBookingReminderPolling(session) {
+  stopBookingReminderPolling();
+  await checkUpcomingBookingReminder(session);
+  bookingReminderTimer = window.setInterval(async function () {
+    await checkUpcomingBookingReminder(session);
+  }, 60000);
+}
+
+function getPendingRegistration(email) {
+  try {
+    const raw = localStorage.getItem(`ezp_pending_registration_${email}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setPendingRegistration(email, payload) {
+  localStorage.setItem(`ezp_pending_registration_${email}`, JSON.stringify(payload));
+}
+
+function clearPendingRegistration(email) {
+  localStorage.removeItem(`ezp_pending_registration_${email}`);
+}
+
+function getBookingPayloadFromForm() {
+  const bookingPlateChoice = document.getElementById("bookingPlate").value;
+  const floorId = document.getElementById("bookingFloor").value;
+  const slotId = document.getElementById("bookingSlot").value;
+  const startValue = document.getElementById("bookingStart").value;
+  const endValue = document.getElementById("bookingEnd").value;
+
+  if (!bookingPlateChoice && !floorId && !slotId && !startValue && !endValue) {
+    return null;
+  }
+
+  if (!bookingPlateChoice || !floorId || !slotId || !startValue || !endValue) {
+    throw new Error("Please complete all booking fields or leave them all empty.");
+  }
+
+  const plateValue = normalizePlate(
+    document.getElementById(`plate${bookingPlateChoice}`).value
+  );
+  const registrationCity = normalizeRegistrationCity(
+    document.getElementById(`plate${bookingPlateChoice}City`).value
+  );
+
+  if (!plateValue) {
+    throw new Error("The selected booking plate is empty. Please enter that car plate first.");
+  }
+
+  if (!registrationCity) {
+    throw new Error("Please enter the city or province for the selected booking plate.");
+  }
+
+  const startTime = new Date(startValue);
+  const endTime = new Date(endValue);
+
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+    throw new Error("Please choose a valid booking time range.");
+  }
+
+  return {
+    plateNumber: plateValue,
+    registrationCity,
+    floorNo: Number(floorId),
+    slot: Number(slotId),
+    startTime: startTime.toISOString(),
+    endTime: endTime.toISOString()
+  };
+}
+
+function setDefaultBookingTimes() {
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+
+  const start = new Date(now);
+  start.setHours(start.getHours() + 1);
+
+  const end = new Date(start);
+  end.setHours(end.getHours() + 1);
+
+  document.getElementById("bookingStart").value = toLocalInputValue(start);
+  document.getElementById("bookingEnd").value = toLocalInputValue(end);
+  document.getElementById("existingBookingStart").value = toLocalInputValue(start);
+  document.getElementById("existingBookingEnd").value = toLocalInputValue(end);
+}
+
+async function loadExistingVehicles() {
+  const { data, error } = await supabaseClient
+    .from("vehicle_registrations")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  existingVehicles = Array.isArray(data) ? data : [];
+}
+
+async function loadReservableSlots() {
+  const { data, error } = await supabaseClient
+    .from("parking_slots")
+    .select("id, code, slot_number, floor_id")
+    .eq("is_reservable", true)
+    .eq("is_active", true)
+    .order("slot_number", { ascending: true });
+
+  if (error) {
+    reservableSlots = [];
+    return;
+  }
+
+  reservableSlots = Array.isArray(data)
+    ? data.filter((slot) => Number(slot.floor_id) === 2)
+    : [];
+}
+
+function vehicleLabel(vehicle) {
+  return vehicle.registration_city
+    ? `${vehicle.plate_number} • ${vehicle.registration_city}`
+    : vehicle.plate_number;
+}
+
+function renderExistingBookingOptions() {
+  const vehicleSelect = document.getElementById("existingVehicle");
+  const slotSelect = document.getElementById("existingSlot");
+
+  vehicleSelect.innerHTML = '<option value="">Select registered car</option>';
+  existingVehicles.forEach((vehicle) => {
+    const option = document.createElement("option");
+    option.value = vehicle.id;
+    option.textContent = vehicleLabel(vehicle);
+    vehicleSelect.appendChild(option);
+  });
+
+  slotSelect.innerHTML = '<option value="">Select slot</option>';
+  reservableSlots.forEach((slot) => {
+    const option = document.createElement("option");
+    option.value = slot.id;
+    option.textContent = slot.code || `Slot ${slot.slot_number}`;
+    slotSelect.appendChild(option);
+  });
+}
+
+function populateManageVehicleFields() {
+  resetManageCarsForm();
+  existingVehicles.slice(0, 3).forEach((vehicle, index) => {
+    const rowIndex = index + 1;
+    const plateInput = document.getElementById(`managePlate${rowIndex}`);
+    const citySelect = document.getElementById(`managePlate${rowIndex}City`);
+    if (!plateInput || !citySelect) return;
+
+    plateInput.value = vehicle.plate_number || "";
+    citySelect.value = vehicle.registration_city || "";
+    plateInput.dataset.vehicleId = vehicle.id || "";
+    citySelect.dataset.vehicleId = vehicle.id || "";
+  });
+}
+
+async function refreshManageAccountUI(session) {
+  const card = document.getElementById("manageAccountCard");
+  if (!session || !session.user) {
+    card.style.display = "none";
+    resetManageCarsForm();
+    return;
+  }
+
+  try {
+    if (!existingVehicles.length) {
+      await loadExistingVehicles();
+    }
+    populateManageVehicleFields();
+    card.style.display = "";
+  } catch (err) {
+    card.style.display = "none";
+    console.warn("Failed to load account management data:", err.message || err);
+  }
+}
+
+async function refreshExistingBookingUI(session) {
+  const card = document.getElementById("existingBookingCard");
+  if (!session || !session.user) {
+    card.style.display = "none";
+    return;
+  }
+
+  try {
+    await loadExistingVehicles();
+    await loadReservableSlots();
+    await refreshManageAccountUI(session);
+    renderExistingBookingOptions();
+    card.style.display = existingVehicles.length ? "" : "none";
+    setMsg(
+      "existingBookingMsg",
+      existingVehicles.length ? "" : "No registered cars yet. Add a car in Register first.",
+      existingVehicles.length ? "" : "err"
+    );
+  } catch (err) {
+    card.style.display = "none";
+    console.warn("Failed to load existing booking options:", err.message || err);
+  }
+}
+
+async function saveManagedVehicles() {
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData ? sessionData.session : null;
+  if (!session || !session.user) {
+    throw new Error("Please login again before saving cars.");
+  }
+
+  const entries = [1, 2, 3].map((index) => {
+    const plateInput = document.getElementById(`managePlate${index}`);
+    const citySelect = document.getElementById(`managePlate${index}City`);
+    return {
+      vehicleId: plateInput.dataset.vehicleId || citySelect.dataset.vehicleId || "",
+      plateNumber: normalizePlate(plateInput.value),
+      registrationCity: normalizeRegistrationCity(citySelect.value)
+    };
+  });
+
+  if (entries.some((entry) => (entry.plateNumber && !entry.registrationCity) || (!entry.plateNumber && entry.registrationCity))) {
+    throw new Error("Please enter both the plate number and city/province for each car.");
+  }
+
+  const filledEntries = entries.filter((entry) => entry.plateNumber && entry.registrationCity);
+  if (!filledEntries.length) {
+    throw new Error("Please keep at least one car registration.");
+  }
+
+  const existingById = new Map(existingVehicles.map((vehicle) => [String(vehicle.id), vehicle]));
+
+  for (const entry of entries) {
+    if (!entry.vehicleId || !entry.plateNumber || !entry.registrationCity) {
+      continue;
+    }
+
+    const current = existingById.get(String(entry.vehicleId));
+    if (!current) continue;
+
+    if (
+      normalizePlate(current.plate_number) === entry.plateNumber &&
+      normalizeRegistrationCity(current.registration_city) === entry.registrationCity
+    ) {
+      continue;
+    }
+
+    const { error } = await supabaseClient
+      .from("vehicle_registrations")
+      .update({
+        plate_number: entry.plateNumber,
+        registration_city: entry.registrationCity
+      })
+      .eq("id", entry.vehicleId);
+
+    if (error) throw error;
+  }
+
+  const newEntries = filledEntries.filter((entry) => !entry.vehicleId);
+  if (newEntries.length) {
+    const insertRows = newEntries.map((entry, index) => ({
+      user_id: session.user.id,
+      plate_number: entry.plateNumber,
+      registration_city: entry.registrationCity,
+      is_default: existingVehicles.length === 0 && index === 0
+    }));
+
+    let insertResult = await supabaseClient
+      .from("vehicle_registrations")
+      .insert(insertRows);
+
+    if (insertResult.error) {
+      insertResult = await supabaseClient
+        .from("vehicle_registrations")
+        .upsert(insertRows, { onConflict: "user_id,plate_number,registration_city" });
+    }
+
+    if (insertResult.error) throw insertResult.error;
+  }
+
+  await loadExistingVehicles();
+  populateManageVehicleFields();
+  renderExistingBookingOptions();
+}
+
+async function saveBookingByVehicleId(vehicleId, slotId, startTime, endTime) {
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData ? sessionData.session : null;
+  const userId = session && session.user ? session.user.id : null;
+
+  if (!userId) {
+    throw new Error("Please login again before adding a booking.");
+  }
+
+  const directInsert = await supabaseClient
+    .from("bookings")
+    .insert([
+      {
+        user_id: userId,
+        vehicle_id: vehicleId,
+        slot_id: Number(slotId),
+        start_time: startTime,
+        end_time: endTime
+      }
+    ])
+    .select("id")
+    .single();
+
+  if (!directInsert.error) return true;
+
+  const { error } = await supabaseClient.rpc("create_booking", {
+    p_vehicle_id: vehicleId,
+    p_slot_id: Number(slotId),
+    p_start_time: startTime,
+    p_end_time: endTime
+  });
+
+  if (!error) return true;
+
+  const slotRecord = reservableSlots.find((slot) => String(slot.id) === String(slotId));
+  if (!slotRecord) throw error;
+
+  const fallback = await supabaseClient.rpc("create_booking", {
+    p_vehicle_id: vehicleId,
+    p_floor_no: Number(slotRecord.floor_id),
+    p_slot: Number(slotRecord.slot_number),
+    p_start_time: startTime,
+    p_end_time: endTime
+  });
+
+  if (fallback.error) throw fallback.error;
+  return true;
+}
+
+async function refreshSessionUI() {
+  if (!isSupabaseReady()) {
+    const box = document.getElementById("sessionBox");
+    const logoutBtn = document.getElementById("btnLogout");
+    if (box) box.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    return;
+  }
+  const { data } = await supabaseClient.auth.getSession();
+  const session = (data && data.session) ? data.session : null;
+  const box = document.getElementById("sessionBox");
+
+  if (session && session.user && session.user.email) {
+    box.style.display = "";
+    box.className = "msg ok";
+    box.textContent = `Logged in as ${session.user.email}`;
+    toggleLoggedInControls(session);
+    await refreshExistingBookingUI(session);
+    await startBookingReminderPolling(session);
+  } else {
+    showLoggedOutView();
+  }
+}
+
+async function saveVehiclesForUser(userId, plates) {
+  if (!isSupabaseReady()) throw new Error("Supabase not ready");
+  const rows = plates
+    .map((plate) => ({
+      user_id: userId,
+      plate_number: normalizePlate(plate.plateNumber),
+      registration_city: normalizeRegistrationCity(plate.registrationCity)
+    }))
+    .filter((plate) => plate.plate_number && plate.registration_city)
+    .slice(0, 3)
+    .map((plate) => plate);
+
+  if (!rows.length) return [];
+
+  let result = await supabaseClient
+    .from("vehicle_registrations")
+    .upsert(rows, { onConflict: "user_id,plate_number,registration_city" })
+    .select("*");
+
+  if (result.error) {
+    result = await supabaseClient
+      .from("vehicle_registrations")
+      .upsert(
+        rows.map((row, index) => ({
+          user_id: row.user_id,
+          plate_number: row.plate_number,
+          is_default: index === 0
+        })),
+        { onConflict: "user_id,plate_number" }
+      )
+      .select("*");
+  }
+
+  if (result.error) throw result.error;
+  return Array.isArray(result.data) ? result.data : [];
+}
+
+async function saveBookingForUser(booking, vehicles) {
+  if (!booking) return null;
+  if (!isSupabaseReady()) throw new Error("Supabase not ready");
+
+  const plateNumber = normalizePlate(booking.plateNumber);
+  const registrationCity = normalizeRegistrationCity(booking.registrationCity);
+  let vehicle = (vehicles || []).find(
+    (item) =>
+      normalizePlate(item.plate_number) === plateNumber &&
+      normalizeRegistrationCity(item.registration_city) === registrationCity
+  );
+
+  if (!vehicle) {
+    const { data, error } = await supabaseClient
+      .from("vehicle_registrations")
+      .select("id, plate_number, registration_city")
+      .eq("plate_number", plateNumber)
+      .eq("registration_city", registrationCity)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    vehicle = data;
+  }
+
+  if (!vehicle || !vehicle.id) {
+    throw new Error("The selected booking car could not be found.");
+  }
+
+  let slotId = booking.slotId || null;
+  if (!slotId) {
+    if (!reservableSlots.length) {
+      await loadReservableSlots();
+    }
+    const matchedSlot = reservableSlots.find(
+      (slot) =>
+        Number(slot.floor_id) === Number(booking.floorNo) &&
+        Number(slot.slot_number) === Number(booking.slot)
+    );
+    slotId = matchedSlot ? matchedSlot.id : null;
+  }
+
+  if (!slotId) {
+    const { error } = await supabaseClient.rpc("create_booking", {
+      p_vehicle_id: vehicle.id,
+      p_floor_no: Number(booking.floorNo),
+      p_slot: Number(booking.slot),
+      p_start_time: booking.startTime,
+      p_end_time: booking.endTime
+    });
+
+    if (error) throw error;
+    return true;
+  }
+
+  return saveBookingByVehicleId(vehicle.id, slotId, booking.startTime, booking.endTime);
+}
+
+async function trySavePendingRegistrationAfterLogin(email, userId) {
+  const pending = getPendingRegistration(email);
+  if (!pending) return;
+
+  try {
+    const vehicles = await saveVehiclesForUser(userId, pending.plates || []);
+    await saveBookingForUser(pending.booking || null, vehicles);
+    clearPendingRegistration(email);
+  } catch (e) {
+    console.warn("Failed to save pending registration:", (e && e.message) ? e.message : e);
+  }
+}
+
+document.getElementById("tabLogin").addEventListener("click", function () {
+  setActiveTab("login");
+});
+document.getElementById("tabRegister").addEventListener("click", function () {
+  setActiveTab("register");
+});
+
+document.getElementById("btnGoHome").addEventListener("click", () => (location = "/"));
+document.getElementById("btnGoHome2").addEventListener("click", () => (location = "/"));
+
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  if (!isSupabaseReady()) {
+    setMsg("loginMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+
+  setMsg("loginMsg", "", "");
+
+  try {
+    await supabaseClient.auth.signOut({ scope: "local" });
+  } catch (error) {
+    console.warn("Supabase signOut failed:", error && error.message ? error.message : error);
+  }
+
+  clearStoredSupabaseSessions();
+  showLoggedOutView();
+
+  window.setTimeout(() => {
+    window.location.replace("auth.html?logout=1&t=" + Date.now());
+  }, 50);
+});
+
+document.getElementById("btnLogin").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("loginMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+  setMsg("loginMsg", "Signing in...", "");
+
+  const email = (document.getElementById("loginEmail").value || "").trim();
+  const password = document.getElementById("loginPassword").value || "";
+
+  if (!email || !password) {
+    setMsg("loginMsg", "Please enter email and password.", "err");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    setMsg("loginMsg", error.message, "err");
+    return;
+  }
+
+  await refreshSessionUI();
+  const user = data ? data.user : null;
+  if (user && user.id && user.email) {
+    await trySavePendingRegistrationAfterLogin(user.email, user.id);
+  }
+
+  setMsg("loginMsg", "Login successful.", "ok");
+});
+
+document.getElementById("btnAddBooking").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("existingBookingMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+
+  const vehicleId = document.getElementById("existingVehicle").value;
+  const slotId = document.getElementById("existingSlot").value;
+  const startValue = document.getElementById("existingBookingStart").value;
+  const endValue = document.getElementById("existingBookingEnd").value;
+
+  if (!vehicleId || !slotId || !startValue || !endValue) {
+    setMsg("existingBookingMsg", "Please choose car, slot, start time, and end time.", "err");
+    return;
+  }
+
+  const startTime = new Date(startValue);
+  const endTime = new Date(endValue);
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+    setMsg("existingBookingMsg", "Please choose a valid booking time range.", "err");
+    return;
+  }
+
+  setMsg("existingBookingMsg", "Saving booking...", "");
+  try {
+    await saveBookingByVehicleId(vehicleId, slotId, startTime.toISOString(), endTime.toISOString());
+    setMsg("existingBookingMsg", "Booking saved successfully.", "ok");
+    const { data } = await supabaseClient.auth.getSession();
+    const session = data ? data.session : null;
+    await checkUpcomingBookingReminder(session);
+
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  } catch (err) {
+    setMsg("existingBookingMsg", err.message || "Booking failed.", "err");
+  }
+});
+
+document.getElementById("btnChangePassword").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("passwordMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+
+  const newPassword = document.getElementById("newPassword").value || "";
+  const confirmPassword = document.getElementById("confirmPassword").value || "";
+
+  if (!newPassword || !confirmPassword) {
+    setMsg("passwordMsg", "Please enter and confirm your new password.", "err");
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    setMsg("passwordMsg", "Password should be at least 6 characters.", "err");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    setMsg("passwordMsg", "The new passwords do not match.", "err");
+    return;
+  }
+
+  setMsg("passwordMsg", "Changing password...", "");
+
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if (error) {
+    setMsg("passwordMsg", error.message || "Could not change password.", "err");
+    return;
+  }
+
+  document.getElementById("newPassword").value = "";
+  document.getElementById("confirmPassword").value = "";
+  setMsg("passwordMsg", "Password changed successfully.", "ok");
+});
+
+document.getElementById("btnSaveCars").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("manageCarsMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+
+  setMsg("manageCarsMsg", "Saving car registrations...", "");
+
+  try {
+    await saveManagedVehicles();
+    setMsg("manageCarsMsg", "Car registrations updated.", "ok");
+  } catch (err) {
+    setMsg("manageCarsMsg", err.message || "Could not save car registrations.", "err");
+  }
+});
+
+document.getElementById("btnRegister").addEventListener("click", async function () {
+  if (!isSupabaseReady()) {
+    setMsg("regMsg", "Supabase client not loaded. Please refresh the page.", "err");
+    return;
+  }
+  setMsg("regMsg", "Creating account...", "");
+
+  const email = (document.getElementById("regEmail").value || "").trim();
+  const password = document.getElementById("regPassword").value || "";
+  const plates = [1, 2, 3]
+    .map((index) => ({
+      plateNumber: document.getElementById(`plate${index}`).value,
+      registrationCity: document.getElementById(`plate${index}City`).value
+    }))
+    .map((plate) => ({
+      plateNumber: normalizePlate(plate.plateNumber),
+      registrationCity: normalizeRegistrationCity(plate.registrationCity)
+    }))
+    .filter((plate) => plate.plateNumber || plate.registrationCity)
+    .slice(0, 3);
+  let booking = null;
+
+  if (!email || !password) {
+    setMsg("regMsg", "Please enter email and password.", "err");
+    return;
+  }
+
+  if (!plates.length) {
+    setMsg("regMsg", "Please enter at least one car plate.", "err");
+    return;
+  }
+
+  if (plates.some((plate) => !plate.plateNumber || !plate.registrationCity)) {
+    setMsg("regMsg", "Please enter both the plate number and city/province for each car.", "err");
+    return;
+  }
+
+  try {
+    booking = getBookingPayloadFromForm();
+  } catch (err) {
+    setMsg("regMsg", err.message || "Booking details are invalid.", "err");
+    return;
+  }
+
+  setPendingRegistration(email, { plates, booking });
+
+  const { data, error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) {
+    setMsg("regMsg", error.message, "err");
+    return;
+  }
+
+  const session = (data && data.session) ? data.session : null;
+  const user = data ? data.user : null;
+
+  // If signup returned a session, we can store plates immediately.
+  if (session && session.user && session.user.id) {
+    try {
+      const vehicles = await saveVehiclesForUser(session.user.id, plates);
+      await saveBookingForUser(booking, vehicles);
+      clearPendingRegistration(email);
+      setMsg(
+        "regMsg",
+        booking ? "Account, car registration, and booking saved." : "Account and car registration saved.",
+        "ok"
+      );
+    } catch (e) {
+      setMsg("regMsg", "Account created. Your saved registration data will finish after you login.", "ok");
+    }
+    await refreshSessionUI();
+    location = "/";
+    return;
+  }
+
+  // Email confirmation likely enabled
+  if (user && user.email) {
+    setMsg(
+      "regMsg",
+      "Account created. Check your email to confirm, then login to finish the car registration and booking.",
+      "ok"
+    );
+    setActiveTab("login");
+  } else {
+    setMsg("regMsg", "Account created. Please login.", "ok");
+    setActiveTab("login");
+  }
+});
+
+document.addEventListener("DOMContentLoaded", async function () {
+  // Ensure tab switching works even if Supabase fails to load.
+  setActiveTab("login");
+  populateProvinceSelect("plate1City");
+  populateProvinceSelect("plate2City");
+  populateProvinceSelect("plate3City");
+  populateProvinceSelect("managePlate1City");
+  populateProvinceSelect("managePlate2City");
+  populateProvinceSelect("managePlate3City");
+
+  try {
+    await initSupabaseClient();
+  } catch (err) {
+    console.error(err);
+  }
+
+  if (!isSupabaseReady()) {
+    setMsg(
+      "loginMsg",
+      "Supabase client failed to load. Check your server environment and refresh the page.",
+      "err"
+    );
+  } else {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("logout") === "1") {
+      clearStoredSupabaseSessions();
+      showLoggedOutView();
+    }
+
+    await refreshSessionUI();
+    setDefaultBookingTimes();
+    document.getElementById("bookingFloor").value = "2";
+    supabaseClient.auth.onAuthStateChange(async function () {
+      await refreshSessionUI();
+    });
+  }
+});
+</script>
+
+</body>
+</html>
+
+
+

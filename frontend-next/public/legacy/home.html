@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — Home</title>
+
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="booking-reminders.js"></script>
+
+<style>
+.container{max-width:1100px;margin:20px auto;padding:20px}
+
+/* header */
+.top-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  margin-bottom:18px;
+}
+.app-title{font-size:26px;font-weight:800}
+.app-sub{color:var(--muted);margin-top:6px}
+.online-pill{
+  padding:8px 14px;
+  border-radius:20px;
+  border:1px solid var(--panel-border);
+  background:rgba(0,0,0,0.2);
+  color:var(--accent);
+  font-size:13px;
+}
+
+.header-right{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:flex-end;
+}
+
+.account-link{
+  border:1px solid var(--panel-border);
+  background:transparent;
+  color:var(--text);
+  padding:8px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:800;
+}
+
+/* cards */
+.big-cards{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+
+.big-card{
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid var(--panel-border);
+  border-radius:16px;
+  padding:18px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.big-card .title{font-size:18px;font-weight:800}
+.big-card .count{font-size:30px;font-weight:800;margin-top:8px}
+.big-card .sub{color:var(--muted);font-size:13px;margin-top:4px}
+
+.view-btn{
+  border:1px solid var(--panel-border);
+  background:transparent;
+  color:var(--text);
+  padding:8px 14px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+/* detail list */
+.detail-box{
+  margin-top:18px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid var(--panel-border);
+  border-radius:16px;
+  padding:16px;
+}
+
+.detail-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:14px;
+  border-radius:12px;
+  background:rgba(255,255,255,0.01);
+  margin-bottom:12px;
+}
+
+.detail-left{display:flex;gap:12px;align-items:flex-start}
+.badge{
+  width:36px;height:36px;border-radius:10px;
+  display:grid;place-items:center;
+  background:rgba(0,150,120,0.15);
+  color:var(--accent);
+  font-weight:800;
+}
+
+.progress{
+  width:120px;height:8px;border-radius:8px;background:rgba(255,255,255,0.05);
+  overflow:hidden;
+}
+.progress span{
+  display:block;height:100%;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  width:0%;
+  transition:width .6s;
+}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="top-header">
+    <div>
+      <div class="app-title">EZP Parking</div>
+      <div class="app-sub">Assumption University • Live system</div>
+    </div>
+    <div class="header-right">
+      <button class="account-link" type="button" onclick="location='/auth'">Account</button>
+      <div class="online-pill">● Online • ~3s updates</div>
+    </div>
+  </div>
+
+  <!-- BIG CARDS -->
+  <div class="big-cards" id="bigCards"></div>
+
+  <!-- DETAIL -->
+  <div class="detail-box">
+    <div style="font-weight:800;margin-bottom:12px">Detail</div>
+    <div id="detailList"></div>
+  </div>
+
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <button class="nav-btn active" data-page="home" onclick="location='/'">Home</button>
+  <button class="nav-btn" data-page="alerts" onclick="location='/alerts'">Alerts</button>
+  <button class="nav-btn" data-page="settings" onclick="location='/settings'">Settings</button>
+</div>
+
+<script>
+const FLOORS = [
+  { id: "F1", name: "1st Floor", subtitle: "3 parking slots" },
+  { id: "F2", name: "2nd Floor", subtitle: "3 parking slots" }
+];
+
+/* =========================
+   LOAD FLOOR STATS
+========================= */
+async function loadFloorStats() {
+  const fallback = {
+    F1: { total: 3, occupied: 0, free: 3 },
+    F2: { total: 3, occupied: 0, free: 3 }
+  };
+
+  const responses = await Promise.all(
+    [1, 2].map(async (floorId, index) => {
+      const response = await fetch(`/api/floors/${floorId}/slots`, {
+        headers: { Accept: "application/json" }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Unable to load floor ${floorId}`);
+      }
+
+      const slots = await response.json();
+      const total = Array.isArray(slots) ? slots.length : 0;
+      const occupied = Array.isArray(slots)
+        ? slots.filter((slot) => slot.status === "occupied").length
+        : 0;
+
+      return [FLOORS[index].id, { total, occupied, free: total - occupied }];
+    })
+  ).catch((error) => {
+    console.error("floor stats error", error);
+    return null;
+  });
+
+  if (!responses) {
+    return fallback;
+  }
+
+  return Object.fromEntries(responses);
+}
+
+/* =========================
+   RENDER HOME
+========================= */
+async function renderHome() {
+  const big = document.getElementById("bigCards");
+  const detail = document.getElementById("detailList");
+
+  big.innerHTML = "";
+  detail.innerHTML = "<div style='color:var(--muted)'>Loading...</div>";
+
+  try {
+    const stats = await loadFloorStats();
+
+    detail.innerHTML = "";
+
+    const bigFrag = document.createDocumentFragment();
+    const detailFrag = document.createDocumentFragment();
+
+    FLOORS.forEach((floor) => {
+      const stat = stats[floor.id] || { total: 0, occupied: 0, free: 0 };
+      const occPct = stat.total
+        ? Math.round((stat.occupied / stat.total) * 100)
+        : 0;
+
+      const bigCard = document.createElement("div");
+      bigCard.className = "big-card";
+      bigCard.innerHTML = `
+        <div>
+          <div class="title">${floor.name}</div>
+          <div class="count">${stat.free} / ${stat.total}</div>
+          <div class="sub">${floor.subtitle}</div>
+        </div>
+        <button class="view-btn"
+          onclick="location='/floor#${floor.id}'">
+          View
+        </button>
+      `;
+      bigFrag.appendChild(bigCard);
+
+      const detailItem = document.createElement("div");
+      detailItem.className = "detail-item";
+      detailItem.innerHTML = `
+        <div class="detail-left">
+          <div class="badge">${floor.id}</div>
+          <div>
+            <div style="font-weight:800">${floor.name}</div>
+            <div style="color:var(--accent);margin-top:6px">
+              Free ${stat.free} / ${stat.total}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:var(--muted);font-size:12px">
+            ${new Date().toLocaleTimeString()}
+          </div>
+          <div class="progress">
+            <span style="width:${occPct}%"></span>
+          </div>
+        </div>
+      `;
+      detailFrag.appendChild(detailItem);
+    });
+
+    big.appendChild(bigFrag);
+    detail.appendChild(detailFrag);
+  } catch (err) {
+    console.error(err);
+    detail.innerHTML =
+      "<div style='color:red'>Connection error to Supabase</div>";
+  }
+}
+
+/* =========================
+   INIT
+========================= */
+document.addEventListener("DOMContentLoaded", () => {
+  renderHome();
+  setInterval(renderHome, 3000);
+});
+</script>

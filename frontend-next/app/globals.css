@@ -1,0 +1,107 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
+
+/* Copied from existing common.css (kept as-is as much as possible) */
+:root {
+  /* Dark theme (default) */
+  --bg: #050b16;
+  --panel: #0b1220;
+  --text: #e9f1ff;
+  --muted: #8aa0c6;
+  --panel-border: rgba(255, 255, 255, 0.06);
+
+  --accent: #13b5d3;
+  --accent-2: #19b28b;
+  --danger: #ff5c5c;
+}
+
+:root[data-theme="light"] {
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --text: #0b1220;
+  --muted: #5b6b88;
+  --panel-border: rgba(0, 0, 0, 0.08);
+
+  --accent: #2f63ff;
+  --accent-2: #13b5d3;
+  --danger: #e53935;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.container {
+  max-width: 1280px;
+  margin: 18px auto;
+  padding: 18px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 18px;
+  display: flex;
+  gap: 12px;
+  z-index: 20;
+}
+
+.nav-btn {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.02),
+    rgba(255, 255, 255, 0.01)
+  );
+  padding: 12px 22px;
+  border-radius: 12px;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.nav-btn.active {
+  background: linear-gradient(180deg, #0c2333, #081622);
+  color: var(--accent);
+  box-shadow: 0 12px 30px rgba(1, 6, 9, 0.6);
+}
+
+.card {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.small {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.progress {
+  width: 120px;
+  height: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
