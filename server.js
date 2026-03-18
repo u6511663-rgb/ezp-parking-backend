@@ -14,8 +14,19 @@ loadEnvFile(path.join(__dirname, ".env"));
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from root and public folder
 app.use(express.static(__dirname));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
+// Explicit routes for static files
+app.get('/common.css', (req, res) => {
+  res.sendFile(path.join(__dirname, 'common.css'));
+});
+app.get('/booking-reminders.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'booking-reminders.js'));
+});
+
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
