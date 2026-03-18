@@ -240,7 +240,6 @@
   <!-- Bottom Navigation -->
 <div class="bottom-nav">
   <button class="nav-btn" data-page="home" onclick="location='home.html'">Home</button>
-  <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
   <button class="nav-btn" data-page="settings" onclick="location='settings.html'">Settings</button>
 </div>
 
@@ -319,12 +318,18 @@ const FLOOR_LAYOUT = {
 };
 
 /* =========================
-   LOAD SLOTS
+   LOAD SLOTS from parking_slots
 ========================= */
 async function loadSlots(floorId){
-  const res = await fetch(`${API}/floors/${floorId}/slots`);
+  // Fetch directly from parking_slots table
+  const res = await fetch(`${API}/slots?floor_id=${floorId}`);
   if(!res.ok) return [];
-  return await res.json();
+  const slots = await res.json();
+  // Map status: empty = free, occupied = occupied
+  return slots.map(slot => ({
+    ...slot,
+    status: slot.status === 'occupied' ? 'occupied' : 'free'
+  }));
 }
 
 /* =========================
@@ -360,6 +365,8 @@ function buildDefaultSlot(level, index, floorId) {
 /* =========================
    RENDER FLOOR
 ========================= */
+let previousSlots = {};
+
 async function renderLayout(level){
 
   const floorId = FLOOR_ID_MAP[level];
@@ -369,66 +376,74 @@ async function renderLayout(level){
 
   const SLOT_MAP = {};
   let free = 0;
-  const normalizedSlots = Array.from({ length: 3 }, (_, index) => {
-    const source = Array.isArray(slots) ? slots[index] : null;
-    if (!source) {
-      return buildDefaultSlot(level, index, floorId);
-    }
 
-    const displayCode = level === "F2"
-      ? `F2-0${index + 1}`
-      : `F1-0${index + 1}`;
-    const syntheticCode = level === "F2"
-      ? `F2-S${index + 1}`
-      : `F1-S${index + 1}`;
+  // Build slot map from database data
+  slots.forEach((slot) => {
+    const layoutCode = `${level}-S${slot.slot_number}`;
+    const isOccupied = slot.status === 'occupied';
 
-    return {
-      ...source,
-      code: syntheticCode,
-      displayCode,
-      status: source.status === "occupied" ? "occupied" : "free"
+    SLOT_MAP[layoutCode] = {
+      ...slot,
+      code: slot.code,
+      displayCode: slot.code,
+      status: isOccupied ? 'occupied' : 'free'
     };
+
+    if(!isOccupied) free++;
   });
 
-  normalizedSlots.forEach((slot) => {
-    SLOT_MAP[slot.code] = slot;
-    if(slot.status === "free") free++;
-  });
-
-  const total = normalizedSlots.length;
+  const total = slots.length || 3;
   const occ = total - free;
 
-  document.getElementById("counts").textContent =
-    `Free ${free} • Occ ${occ}`;
+  // Update counts only
+  document.getElementById("counts").textContent = `Free ${free} • Occ ${occ}`;
+  document.getElementById("pageTitle").textContent = level === "F2" ? "2nd Floor" : "1st Floor";
+  document.getElementById("pageSub").textContent = level === "F2"
+    ? "Barrier booking floor with 3 slots"
+    : "General parking floor with 3 slots";
 
-  document.getElementById("pageTitle").textContent =
-    level === "F2" ? "2nd Floor" : "1st Floor";
-
-  const layoutDef = FLOOR_LAYOUT[level];
   const layout = document.getElementById("parkingLayout");
-  layout.innerHTML = "";
-  document.getElementById("pageSub").textContent =
-    level === "F2"
-      ? "Barrier booking floor with 3 slots"
-      : "General parking floor with 3 slots";
 
-  layoutDef.rows.forEach(rowDef=>{
-    const row = document.createElement("div");
-    row.className = "slot-row";
+  // First render - create layout
+  if (layout.innerHTML === '' || !previousSlots[level]) {
+    layout.innerHTML = "";
+    const layoutDef = FLOOR_LAYOUT[level];
 
-    rowDef.forEach(code=>{
-      const cell = document.createElement("div");
-      cell.className = "slot-cell";
+    layoutDef.rows.forEach(rowDef=>{
+      const row = document.createElement("div");
+      row.className = "slot-row";
 
-      if(code && SLOT_MAP[code]){
-        cell.appendChild(createSlotEl(SLOT_MAP[code]));
-      }
+      rowDef.forEach(code=>{
+        const cell = document.createElement("div");
+        cell.className = "slot-cell";
+        cell.id = `cell-${code}`;
 
-      row.appendChild(cell);
+        if(code && SLOT_MAP[code]){
+          cell.appendChild(createSlotEl(SLOT_MAP[code]));
+        }
+
+        row.appendChild(cell);
+      });
+
+      layout.appendChild(row);
     });
+  } else {
+    // Update only changed slots
+    Object.keys(SLOT_MAP).forEach(code => {
+      const slot = SLOT_MAP[code];
+      const prevSlot = previousSlots[level]?.[code];
 
-    layout.appendChild(row);
-  });
+      if (!prevSlot || prevSlot.status !== slot.status) {
+        const cell = document.getElementById(`cell-${code}`);
+        if (cell) {
+          cell.innerHTML = '';
+          cell.appendChild(createSlotEl(slot));
+        }
+      }
+    });
+  }
+
+  previousSlots[level] = SLOT_MAP;
 }
 
 /* =========================
@@ -440,11 +455,16 @@ document.addEventListener("DOMContentLoaded", ()=>{
   document.querySelectorAll(".floor-tab")
     .forEach(btn=>{
       btn.addEventListener("click", ()=>{
+        const level = btn.dataset.level;
+
+        // Update URL hash to match selected floor
+        window.location.hash = level;
+
         document.querySelectorAll(".floor-tab")
           .forEach(b=>b.classList.remove("active"));
 
         btn.classList.add("active");
-        renderLayout(btn.dataset.level);
+        renderLayout(level);
       });
     });
 
@@ -464,14 +484,14 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
   renderLayout(initialLevel);
 
-  // Auto refresh
+  // Auto refresh every 10 seconds
   setInterval(()=>{
     const active =
       document.querySelector(".floor-tab.active")
       ?.dataset.level || "F1";
 
     renderLayout(active);
-  },3000);
+  },10000);
 
 });
 </script>

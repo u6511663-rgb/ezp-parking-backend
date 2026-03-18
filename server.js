@@ -184,6 +184,40 @@ app.get("/api/buildings/:id/status", async (req, res, next) => {
   }
 });
 /* ==============================
+   PARKING SLOTS (from parking_slots table)
+============================== */
+
+// Get slots directly from parking_slots table
+app.get("/api/slots", async (req, res, next) => {
+  try {
+    const { floor_id } = req.query;
+
+    let query = supabase
+      .from("parking_slots")
+      .select("id, floor_id, code, slot_number, status")
+      .order("slot_number");
+
+    if (floor_id) {
+      query = query.eq("floor_id", parseInt(floor_id, 10));
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Map status for frontend: empty = free, occupied = occupied
+    const mappedSlots = (data || []).map(slot => ({
+      ...slot,
+      status: slot.status === 'occupied' ? 'occupied' : 'free'
+    }));
+
+    res.json(mappedSlots);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ==============================
    FLOOR SLOTS
 ============================== */
 
@@ -331,12 +365,363 @@ app.get("/api/zone/status", async (req, res, next) => {
 
 
 /* ==============================
+   GUEST REQUESTS API
+============================== */
+
+// Create a new guest request
+app.post("/api/guest/request", async (req, res, next) => {
+  try {
+    const { full_name, license_plate, phone, arrival_time } = req.body;
+
+    // Validation
+    if (!full_name || !license_plate || !arrival_time) {
+      return res.status(400).json({
+        error: "MISSING_REQUIRED_FIELDS",
+        message: "Full name, license plate, and arrival time are required"
+      });
+    }
+
+    // Validate Thai/Unicode characters for name (at least 2 chars)
+    const trimmedName = String(full_name).trim();
+    if (trimmedName.length < 2) {
+      return res.status(400).json({
+        error: "INVALID_NAME",
+        message: "Name must be at least 2 characters"
+      });
+    }
+
+    // Validate license plate (at least 3 chars, supports Thai)
+    const trimmedPlate = String(license_plate).trim().toUpperCase();
+    if (trimmedPlate.length < 3) {
+      return res.status(400).json({
+        error: "INVALID_LICENSE_PLATE",
+        message: "License plate must be at least 3 characters"
+      });
+    }
+
+    // Validate phone if provided (at least 9 digits)
+    let trimmedPhone = phone ? String(phone).trim() : null;
+    if (trimmedPhone && trimmedPhone.replace(/\D/g, "").length < 9) {
+      return res.status(400).json({
+        error: "INVALID_PHONE",
+        message: "Phone number must be at least 9 digits"
+      });
+    }
+
+    // Create the request (auto-approved, no verification needed, no duplicate check)
+    const now = new Date();
+    const insertData = {
+      full_name: trimmedName,
+      license_plate: trimmedPlate,
+      phone: trimmedPhone,
+      status: "approved",  // Auto-approved, no admin verification
+      approved_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+    };
+
+    console.log("Creating guest request:", insertData);
+
+    // Only add arrival_time if provided (for backward compatibility)
+    if (arrival_time) {
+      insertData.arrival_time = arrival_time;
+    }
+
+    const { data, error } = await supabase
+      .from("guest_requests")
+      .insert([insertData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      throw error;
+    }
+
+    console.log("Guest request created:", data);
+
+    res.status(201).json({
+      success: true,
+      message: "Request submitted successfully",
+      request: {
+        id: data.id,
+        full_name: data.full_name,
+        license_plate: data.license_plate,
+        arrival_time: data.arrival_time,
+        status: data.status,
+        requested_at: data.requested_at
+      }
+    });
+  } catch (err) {
+    console.error("Guest request error:", err);
+    next(err);
+  }
+});
+
+// Get guest request by ID
+app.get("/api/guest/request/:id", async (req, res, next) => {
+  try {
+    const requestId = req.params.id;
+
+    const { data, error } = await supabase
+      .from("guest_request_overview")
+      .select("*")
+      .eq("id", requestId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return res.status(404).json({ error: "Request not found" });
+      }
+      throw error;
+    }
+
+    res.json({
+      id: data.id,
+      full_name: data.full_name,
+      license_plate: data.license_plate,
+      phone: data.phone,
+      arrival_time: data.arrival_time,
+      status: data.status,
+      requested_at: data.requested_at,
+      approved_at: data.approved_at,
+      checked_in_at: data.checked_in_at,
+      checked_out_at: data.checked_out_at,
+      expires_at: data.expires_at,
+      notes: data.notes,
+      rejection_reason: data.rejection_reason,
+      slot: data.slot_code ? {
+        code: data.slot_code,
+        number: data.slot_number,
+        floor: data.floor_code,
+        floor_name: data.floor_name
+      } : null
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Cancel/delete a guest request (by the guest)
+app.post("/api/guest/request/:id/cancel", async (req, res, next) => {
+  try {
+    const requestId = req.params.id;
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("guest_requests")
+      .select("id, status, assigned_slot_id")
+      .eq("id", requestId)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === "PGRST116") {
+        return res.status(404).json({ error: "Request not found" });
+      }
+      throw fetchError;
+    }
+
+    if (!["pending", "approved"].includes(existing.status)) {
+      return res.status(400).json({
+        error: "CANNOT_CANCEL",
+        message: "Only pending or approved requests can be cancelled"
+      });
+    }
+
+    // Delete the request from database
+    const { error: deleteError } = await supabase
+      .from("guest_requests")
+      .delete()
+      .eq("id", requestId);
+
+    if (deleteError) throw deleteError;
+
+    res.json({ success: true, message: "Request deleted" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Search guest requests by phone (for guests to find their requests)
+app.get("/api/guest/search", async (req, res, next) => {
+  try {
+    const { phone } = req.query;
+
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+
+    const { data, error } = await supabase
+      .from("guest_request_overview")
+      .select("*")
+      .ilike("phone", `%${phone}%`)
+      .order("requested_at", { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    res.json({
+      requests: data || [],
+      count: data ? data.length : 0
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// List all guest requests (for admin)
+app.get("/api/guest/requests", async (req, res, next) => {
+  try {
+    const { status, limit = 50, offset = 0 } = req.query;
+
+    let query = supabase
+      .from("guest_request_overview")
+      .select("*", { count: "exact" })
+      .order("requested_at", { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      requests: data,
+      total: count,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Approve a guest request (admin only)
+app.post("/api/guest/request/:id/approve", async (req, res, next) => {
+  try {
+    const requestId = req.params.id;
+    const { slot_id, notes } = req.body;
+
+    if (!slot_id) {
+      return res.status(400).json({ error: "Slot ID is required" });
+    }
+
+    // Get admin user from auth header (simplified - in production use proper auth)
+    const { data: request, error } = await supabase.rpc("approve_guest_request", {
+      p_request_id: requestId,
+      p_slot_id: parseInt(slot_id),
+      p_admin_id: null, // Will be set from auth context in production
+      p_notes: notes || null
+    });
+
+    if (error) {
+      if (error.message.includes("REQUEST_NOT_FOUND")) {
+        return res.status(404).json({ error: "Request not found or not pending" });
+      }
+      if (error.message.includes("SLOT_NOT_AVAILABLE")) {
+        return res.status(400).json({ error: "Selected slot is not available" });
+      }
+      throw error;
+    }
+
+    res.json({ success: true, request });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Reject a guest request (admin only)
+app.post("/api/guest/request/:id/reject", async (req, res, next) => {
+  try {
+    const requestId = req.params.id;
+    const { reason } = req.body;
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("guest_requests")
+      .select("id, status")
+      .eq("id", requestId)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === "PGRST116") {
+        return res.status(404).json({ error: "Request not found" });
+      }
+      throw fetchError;
+    }
+
+    if (existing.status !== "pending") {
+      return res.status(400).json({ error: "Only pending requests can be rejected" });
+    }
+
+    const { error: updateError } = await supabase
+      .from("guest_requests")
+      .update({
+        status: "rejected",
+        rejection_reason: reason || null
+      })
+      .eq("id", requestId);
+
+    if (updateError) throw updateError;
+
+    res.json({ success: true, message: "Request rejected" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Check in a guest (admin only)
+app.post("/api/guest/request/:id/checkin", async (req, res, next) => {
+  try {
+    const requestId = req.params.id;
+
+    const { data, error } = await supabase.rpc("checkin_guest_request", {
+      p_request_id: requestId
+    });
+
+    if (error) {
+      if (error.message.includes("REQUEST_NOT_APPROVED")) {
+        return res.status(400).json({ error: "Request not approved or expired" });
+      }
+      throw error;
+    }
+
+    res.json({ success: true, request: data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Check out a guest (admin only)
+app.post("/api/guest/request/:id/checkout", async (req, res, next) => {
+  try {
+    const requestId = req.params.id;
+
+    const { data, error } = await supabase.rpc("checkout_guest_request", {
+      p_request_id: requestId
+    });
+
+    if (error) {
+      if (error.message.includes("REQUEST_NOT_CHECKED_IN")) {
+        return res.status(400).json({ error: "Request not checked in" });
+      }
+      throw error;
+    }
+
+    res.json({ success: true, request: data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ==============================
    GLOBAL ERROR HANDLER
 ============================== */
 
 app.use((err, req, res, next) => {
   console.error("SERVER ERROR:", err.message);
-  res.status(500).json({ error: "Internal Server Error" });
+  console.error("Stack:", err.stack);
+  res.status(500).json({ error: "Internal Server Error", message: err.message });
 });
 
 /* ==============================

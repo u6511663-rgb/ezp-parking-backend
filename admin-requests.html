@@ -1,0 +1,979 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — จัดการคำขอผู้มาเยือน / Guest Request Management</title>
+
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  .wrap{max-width:1200px;margin:20px auto;padding:20px}
+
+  /* Header */
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .header h1{font-size:24px;font-weight:800;margin:0}
+  .header-stats{
+    display:flex;
+    gap:16px;
+  }
+  .stat-box{
+    background:rgba(255,255,255,0.02);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:12px 20px;
+    text-align:center;
+  }
+  .stat-value{
+    font-size:24px;
+    font-weight:700;
+    color:var(--accent);
+  }
+  .stat-label{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* Filters */
+  .filters{
+    display:flex;
+    gap:12px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .filter-btn{
+    padding:8px 16px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--muted);
+    border-radius:20px;
+    cursor:pointer;
+    font-size:13px;
+    transition:all .2s;
+  }
+  .filter-btn:hover{color:var(--text)}
+  .filter-btn.active{
+    background:var(--accent);
+    color:#000;
+    border-color:var(--accent);
+    font-weight:600;
+  }
+  .search-input{
+    padding:8px 14px;
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.01);
+    color:var(--text);
+    border-radius:20px;
+    font-size:13px;
+    min-width:200px;
+  }
+  .search-input:focus{
+    outline:none;
+    border-color:var(--accent);
+  }
+  .refresh-btn{
+    padding:8px 16px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    border-radius:20px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .refresh-btn:hover{background:rgba(255,255,255,0.05)}
+
+  /* Table */
+  .table-container{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    overflow:hidden;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:14px;
+  }
+  th{
+    background:rgba(255,255,255,0.03);
+    padding:14px 16px;
+    text-align:left;
+    font-weight:600;
+    color:var(--muted);
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    border-bottom:1px solid var(--panel-border);
+  }
+  td{
+    padding:14px 16px;
+    border-bottom:1px solid var(--panel-border);
+  }
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,0.02)}
+
+  /* Status badges */
+  .badge{
+    display:inline-block;
+    padding:4px 12px;
+    border-radius:12px;
+    font-size:12px;
+    font-weight:600;
+  }
+  .badge-pending{
+    background:rgba(255,193,7,0.15);
+    color:#ffc107;
+  }
+  .badge-approved{
+    background:rgba(0,200,100,0.15);
+    color:#4ade80;
+  }
+  .badge-rejected{
+    background:rgba(255,80,80,0.15);
+    color:#f87171;
+  }
+  .badge-checked_in{
+    background:rgba(19,181,211,0.15);
+    color:var(--accent);
+  }
+  .badge-completed{
+    background:rgba(150,150,150,0.15);
+    color:#9ca3af;
+  }
+  .badge-cancelled{
+    background:rgba(100,100,100,0.15);
+    color:#6b7280;
+  }
+
+  /* Action buttons */
+  .actions-cell{
+    display:flex;
+    gap:8px;
+  }
+  .action-btn{
+    padding:6px 12px;
+    border:none;
+    border-radius:6px;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    transition:opacity .2s;
+  }
+  .action-btn:hover{opacity:.8}
+  .btn-approve{
+    background:#4ade80;
+    color:#000;
+  }
+  .btn-reject{
+    background:transparent;
+    border:1px solid #f87171;
+    color:#f87171;
+  }
+  .btn-checkin{
+    background:var(--accent);
+    color:#000;
+  }
+  .btn-checkout{
+    background:#9ca3af;
+    color:#000;
+  }
+  .btn-view{
+    background:rgba(255,255,255,0.1);
+    color:var(--text);
+  }
+
+  /* Empty state */
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--muted);
+  }
+  .empty-state .icon{font-size:48px;margin-bottom:16px}
+
+  /* Modal */
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.8);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:20px;
+  }
+  .modal-overlay.show{display:flex}
+  .modal{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    width:100%;
+    max-width:500px;
+    max-height:90vh;
+    overflow:auto;
+  }
+  .modal-header{
+    padding:20px;
+    border-bottom:1px solid var(--panel-border);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .modal-title{font-size:18px;font-weight:700}
+  .modal-close{
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-size:24px;
+    cursor:pointer;
+  }
+  .modal-body{padding:20px}
+  .modal-footer{
+    padding:20px;
+    border-top:1px solid var(--panel-border);
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+  }
+
+  /* Form elements in modal */
+  .form-group{margin-bottom:16px}
+  .form-group label{
+    display:block;
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.01);
+    color:var(--text);
+    border-radius:8px;
+    font-size:14px;
+  }
+  .form-group textarea{min-height:80px;resize:vertical}
+
+  .btn-cancel{
+    padding:10px 20px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .btn-confirm{
+    padding:10px 20px;
+    border:none;
+    background:var(--accent);
+    color:#000;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+  }
+
+  /* Info display */
+  .info-row{
+    display:flex;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--panel-border);
+  }
+  .info-row:last-child{border-bottom:none}
+  .info-label{color:var(--muted);font-size:13px}
+  .info-value{font-weight:500}
+
+  /* Slot selector */
+  .slot-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:10px;
+    margin-top:10px;
+  }
+  .slot-option{
+    padding:12px;
+    border:2px solid var(--panel-border);
+    border-radius:10px;
+    text-align:center;
+    cursor:pointer;
+    transition:all .2s;
+  }
+  .slot-option:hover{border-color:var(--accent)}
+  .slot-option.selected{
+    border-color:var(--accent);
+    background:rgba(19,181,211,0.1);
+  }
+  .slot-option.occupied{
+    opacity:.5;
+    cursor:not-allowed;
+    border-color:#f87171;
+  }
+  .slot-code{font-weight:700;font-size:16px}
+  .slot-status{font-size:11px;color:var(--muted);margin-top:4px}
+
+  /* Loading */
+  .loading-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.5);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:2000;
+  }
+  .loading-overlay.show{display:flex}
+  .loading-spinner{
+    width:50px;
+    height:50px;
+    border:4px solid rgba(255,255,255,0.1);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Responsive */
+  @media (max-width:768px){
+    .header{flex-direction:column;align-items:flex-start}
+    .header-stats{width:100%;justify-content:space-between}
+    th,td{padding:10px}
+    .actions-cell{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>👥 จัดการคำขอผู้มาเยือน</h1>
+      <p style="color:var(--muted);margin-top:4px">Guest Request Management</p>
+    </div>
+    <div class="header-stats">
+      <div class="stat-box">
+        <div class="stat-value" id="statPending">0</div>
+        <div class="stat-label">รออนุมัติ / Pending</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="statApproved">0</div>
+        <div class="stat-label">อนุมัติแล้ว / Approved</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="statCheckedIn">0</div>
+        <div class="stat-label">จอดรถ / Checked In</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">ทั้งหมด / All</button>
+    <button class="filter-btn" data-filter="approved" onclick="setFilter('approved')">✅ ยืนยันแล้ว / Confirmed</button>
+    <button class="filter-btn" data-filter="checked_in" onclick="setFilter('checked_in')">🅿️ จอดรถ / Checked In</button>
+    <button class="filter-btn" data-filter="completed" onclick="setFilter('completed')">✔️ เสร็จสิ้น / Completed</button>
+
+    <input
+      type="text"
+      class="search-input"
+      id="searchInput"
+      placeholder="🔍 ค้นหาทะเบียน, ชื่อ, เบอร์โทร..."
+      oninput="handleSearch()"
+    >
+
+    <button class="refresh-btn" onclick="loadRequests()">🔄 รีเฟรช</button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>สถานะ / Status</th>
+          <th>ชื่อ / Name</th>
+          <th>ทะเบียน / Plate</th>
+          <th>เบอร์โทร / Phone</th>
+          <th>ช่องจอด / Slot</th>
+          <th>เวลาที่จะมา / Arrival</th>
+          <th>ส่งคำขอเมื่อ / Submitted</th>
+          <th>จัดการ / Actions</th>
+        </tr>
+      </thead>
+      <tbody id="requestsTable">
+        <tr>
+          <td colspan="8" class="empty-state">
+            <div class="icon">⏳</div>
+            <p>กำลังโหลด... / Loading...</p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal-overlay" id="approveModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✅ อนุมัติคำขอ / Approve Request</div>
+      <button class="modal-close" onclick="closeModal('approveModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-row">
+        <span class="info-label">ชื่อ / Name</span>
+        <span class="info-value" id="approveName">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">ทะเบียน / Plate</span>
+        <span class="info-value" id="approvePlate">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">เวลาที่จะมา / Arrival</span>
+        <span class="info-value" id="approveArrivalTime" style="color:var(--accent);font-weight:600">--</span>
+      </div>
+
+      <div class="form-group" style="margin-top:20px">
+        <label>เลือกช่องจอด / Select Parking Slot</label>
+        <div class="slot-grid" id="slotGrid">
+          <!-- Slots loaded dynamically -->
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>หมายเหตุ / Notes (optional)</label>
+        <textarea id="approveNotes" placeholder="เพิ่มหมายเหตุ..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('approveModal')">ยกเลิก / Cancel</button>
+      <button class="btn-confirm" onclick="confirmApprove()">อนุมัติ / Approve</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal-overlay" id="rejectModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">❌ ปฏิเสธคำขอ / Reject Request</div>
+      <button class="modal-close" onclick="closeModal('rejectModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-row">
+        <span class="info-label">ชื่อ / Name</span>
+        <span class="info-value" id="rejectName">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">ทะเบียน / Plate</span>
+        <span class="info-value" id="rejectPlate">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">เวลาที่จะมา / Arrival</span>
+        <span class="info-value" id="rejectArrivalTime" style="color:var(--accent);font-weight:600">--</span>
+      </div>
+
+      <div class="form-group" style="margin-top:20px">
+        <label>เหตุผล / Reason *</label>
+        <textarea id="rejectReason" placeholder="ระบุเหตุผลในการปฏิเสธ..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('rejectModal')">ยกเลิก / Cancel</button>
+      <button class="btn-confirm" style="background:#f87171" onclick="confirmReject()">ปฏิเสธ / Reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Modal -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📋 รายละเอียดคำขอ / Request Details</div>
+      <button class="modal-close" onclick="closeModal('viewModal')">×</button>
+    </div>
+    <div class="modal-body" id="viewDetails">
+      <!-- Details loaded dynamically -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('viewModal')">ปิด / Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+</div>
+
+<script>
+let allRequests = [];
+let currentFilter = 'all';
+let selectedRequestId = null;
+let selectedSlotId = null;
+let availableSlots = [];
+
+/* =========================
+   LOAD REQUESTS
+========================= */
+async function loadRequests() {
+  showLoading(true);
+
+  try {
+    const response = await fetch('/api/guest/requests?limit=100');
+    if (!response.ok) throw new Error('Failed to load requests');
+
+    const data = await response.json();
+    allRequests = data.requests || [];
+
+    updateStats();
+    renderTable();
+  } catch (err) {
+    console.error('Load error:', err);
+    document.getElementById('requestsTable').innerHTML = `
+      <tr><td colspan="7" class="empty-state">
+        <div class="icon">⚠️</div>
+        <p>ไม่สามารถโหลดข้อมูลได้ / Failed to load</p>
+      </td></tr>`;
+  } finally {
+    showLoading(false);
+  }
+}
+
+function updateStats() {
+  const counts = {
+    approved: allRequests.filter(r => r.status === 'approved').length,
+    checked_in: allRequests.filter(r => r.status === 'checked_in').length
+  };
+
+  document.getElementById('statApproved').textContent = counts.approved;
+  document.getElementById('statCheckedIn').textContent = counts.checked_in;
+}
+
+/* =========================
+   RENDER TABLE
+========================= */
+function renderTable() {
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+  let filtered = allRequests;
+
+  // Apply status filter
+  if (currentFilter !== 'all') {
+    filtered = filtered.filter(r => r.status === currentFilter);
+  }
+
+  // Apply search filter
+  if (searchTerm) {
+    filtered = filtered.filter(r =>
+      (r.full_name || '').toLowerCase().includes(searchTerm) ||
+      (r.license_plate || '').toLowerCase().includes(searchTerm) ||
+      (r.phone || '').includes(searchTerm)
+    );
+  }
+
+  const tbody = document.getElementById('requestsTable');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr><td colspan="7" class="empty-state">
+        <div class="icon">📭</div>
+        <p>ไม่พบคำขอ / No requests found</p>
+      </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(request => `
+    <tr>
+      <td>${renderStatusBadge(request.status)}</td>
+      <td>${escapeHtml(request.full_name)}</td>
+      <td><strong>${escapeHtml(request.license_plate)}</strong></td>
+      <td>${escapeHtml(request.phone || '-')}</td>
+      <td>${request.slot_code || '-'}</td>
+      <td><strong style="color:var(--accent)">${request.arrival_time ? formatTime(request.arrival_time) : '-'}</strong></td>
+      <td>${formatTime(request.requested_at)}</td>
+      <td>
+        <div class="actions-cell">
+          ${renderActions(request)}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderStatusBadge(status) {
+  const labels = {
+    approved: '✅ ยืนยัน',
+    rejected: '❌ ปฏิเสธ',
+    checked_in: '🅿️ จอดรถ',
+    completed: '✔️ เสร็จสิ้น',
+    cancelled: '🚫 ยกเลิก'
+  };
+  return `<span class="badge badge-${status}">${labels[status] || status}</span>`;
+}
+
+function renderActions(request) {
+  const actions = [];
+
+  // Requests are auto-approved, so show Check In immediately
+  if (request.status === 'approved') {
+    actions.push(`<button class="action-btn btn-checkin" onclick="checkIn('${request.id}')">Check In</button>`);
+  }
+
+  if (request.status === 'checked_in') {
+    actions.push(`<button class="action-btn btn-checkout" onclick="checkOut('${request.id}')">Check Out</button>`);
+  }
+
+  actions.push(`<button class="action-btn btn-view" onclick="viewDetails('${request.id}')">ดู</button>`);
+
+  return actions.join('');
+}
+
+/* =========================
+   FILTER & SEARCH
+========================= */
+function setFilter(filter) {
+  currentFilter = filter;
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+
+  renderTable();
+}
+
+function handleSearch() {
+  renderTable();
+}
+
+/* =========================
+   APPROVE MODAL
+========================= */
+async function openApprove(requestId) {
+  const request = allRequests.find(r => r.id === requestId);
+  if (!request) return;
+
+  selectedRequestId = requestId;
+  selectedSlotId = null;
+
+  document.getElementById('approveName').textContent = request.full_name;
+  document.getElementById('approvePlate').textContent = request.license_plate;
+  document.getElementById('approveArrivalTime').textContent = request.arrival_time ? formatTime(request.arrival_time) : '-';
+  document.getElementById('approveNotes').value = '';
+
+  // Load available slots
+  await loadAvailableSlots();
+
+  document.getElementById('approveModal').classList.add('show');
+}
+
+async function loadAvailableSlots() {
+  try {
+    // Load slots from both floors
+    const [floor1, floor2] = await Promise.all([
+      fetch('/api/floors/1/slots').then(r => r.json()),
+      fetch('/api/floors/2/slots').then(r => r.json())
+    ]);
+
+    const slots = [
+      ...(Array.isArray(floor1) ? floor1 : []),
+      ...(Array.isArray(floor2) ? floor2 : [])
+    ];
+
+    availableSlots = slots;
+
+    const grid = document.getElementById('slotGrid');
+    grid.innerHTML = slots.map(slot => `
+      <div class="slot-option ${slot.status === 'occupied' ? 'occupied' : ''}"
+           data-id="${slot.id}"
+           onclick="selectSlot(${slot.id}, ${slot.status === 'occupied'})">
+        <div class="slot-code">${slot.code}</div>
+        <div class="slot-status">${slot.status === 'occupied' ? '❌ ไม่ว่าง' : '✅ ว่าง'}</div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load slots:', err);
+  }
+}
+
+function selectSlot(slotId, isOccupied) {
+  if (isOccupied) return;
+
+  selectedSlotId = slotId;
+
+  document.querySelectorAll('.slot-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === String(slotId));
+  });
+}
+
+async function confirmApprove() {
+  if (!selectedSlotId) {
+    alert('กรุณาเลือกช่องจอด / Please select a slot');
+    return;
+  }
+
+  showLoading(true);
+
+  try {
+    const response = await fetch(`/api/guest/request/${selectedRequestId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slot_id: selectedSlotId,
+        notes: document.getElementById('approveNotes').value
+      })
+    });
+
+    if (response.ok) {
+      closeModal('approveModal');
+      await loadRequests();
+    } else {
+      const data = await response.json();
+      alert(data.error || 'ไม่สามารถอนุมัติได้ / Cannot approve');
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด / An error occurred');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* =========================
+   REJECT MODAL
+========================= */
+function openReject(requestId) {
+  const request = allRequests.find(r => r.id === requestId);
+  if (!request) return;
+
+  selectedRequestId = requestId;
+
+  document.getElementById('rejectName').textContent = request.full_name;
+  document.getElementById('rejectPlate').textContent = request.license_plate;
+  document.getElementById('rejectArrivalTime').textContent = request.arrival_time ? formatTime(request.arrival_time) : '-';
+  document.getElementById('rejectReason').value = '';
+
+  document.getElementById('rejectModal').classList.add('show');
+}
+
+async function confirmReject() {
+  const reason = document.getElementById('rejectReason').value.trim();
+  if (!reason) {
+    alert('กรุณาระบุเหตุผล / Please provide a reason');
+    return;
+  }
+
+  showLoading(true);
+
+  try {
+    const response = await fetch(`/api/guest/request/${selectedRequestId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason })
+    });
+
+    if (response.ok) {
+      closeModal('rejectModal');
+      await loadRequests();
+    } else {
+      const data = await response.json();
+      alert(data.error || 'ไม่สามารถปฏิเสธได้ / Cannot reject');
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด / An error occurred');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* =========================
+   CHECK IN / CHECK OUT
+========================= */
+async function checkIn(requestId) {
+  if (!confirm('ยืนยันการ Check In? / Confirm check in?')) return;
+
+  showLoading(true);
+
+  try {
+    const response = await fetch(`/api/guest/request/${requestId}/checkin`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      await loadRequests();
+    } else {
+      const data = await response.json();
+      alert(data.error || 'ไม่สามารถ Check In ได้ / Cannot check in');
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด / An error occurred');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function checkOut(requestId) {
+  if (!confirm('ยืนยันการ Check Out? / Confirm check out?')) return;
+
+  showLoading(true);
+
+  try {
+    const response = await fetch(`/api/guest/request/${requestId}/checkout`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      await loadRequests();
+    } else {
+      const data = await response.json();
+      alert(data.error || 'ไม่สามารถ Check Out ได้ / Cannot check out');
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด / An error occurred');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* =========================
+   VIEW DETAILS
+========================= */
+function viewDetails(requestId) {
+  const request = allRequests.find(r => r.id === requestId);
+  if (!request) return;
+
+  const statusLabels = {
+    approved: '✅ ยืนยันแล้ว / Confirmed',
+    rejected: '❌ ถูกปฏิเสธ / Rejected',
+    checked_in: '🅿️ จอดรถแล้ว / Checked In',
+    completed: '✔️ เสร็จสิ้น / Completed',
+    cancelled: '🚫 ยกเลิก / Cancelled'
+  };
+
+  document.getElementById('viewDetails').innerHTML = `
+    <div class="info-row">
+      <span class="info-label">รหัสคำขอ / Request ID</span>
+      <span class="info-value" style="font-family:monospace;font-size:12px">${request.id}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">สถานะ / Status</span>
+      <span class="info-value">${statusLabels[request.status] || request.status}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">ชื่อ / Name</span>
+      <span class="info-value">${escapeHtml(request.full_name)}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">ทะเบียน / License Plate</span>
+      <span class="info-value">${escapeHtml(request.license_plate)}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">เบอร์โทร / Phone</span>
+      <span class="info-value">${escapeHtml(request.phone || '-')}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">ช่องจอด / Slot</span>
+      <span class="info-value">${request.slot_code || '-'} ${request.floor_name ? `(${request.floor_name})` : ''}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">เวลาที่จะมาจอด / Arrival Time</span>
+      <span class="info-value" style="color:var(--accent);font-weight:600">${request.arrival_time ? formatTime(request.arrival_time) : '-'}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">ส่งคำขอเมื่อ / Requested At</span>
+      <span class="info-value">${formatTime(request.requested_at)}</span>
+    </div>
+    ${request.approved_at ? `
+    <div class="info-row">
+      <span class="info-label">อนุมัติเมื่อ / Approved At</span>
+      <span class="info-value">${formatTime(request.approved_at)}</span>
+    </div>` : ''}
+    ${request.checked_in_at ? `
+    <div class="info-row">
+      <span class="info-label">Check In เมื่อ / Checked In At</span>
+      <span class="info-value">${formatTime(request.checked_in_at)}</span>
+    </div>` : ''}
+    ${request.checked_out_at ? `
+    <div class="info-row">
+      <span class="info-label">Check Out เมื่อ / Checked Out At</span>
+      <span class="info-value">${formatTime(request.checked_out_at)}</span>
+    </div>` : ''}
+    ${request.rejection_reason ? `
+    <div class="info-row">
+      <span class="info-label">เหตุผลที่ปฏิเสธ / Rejection Reason</span>
+      <span class="info-value" style="color:#f87171">${escapeHtml(request.rejection_reason)}</span>
+    </div>` : ''}
+    ${request.notes ? `
+    <div class="info-row">
+      <span class="info-label">หมายเหตุ / Notes</span>
+      <span class="info-value">${escapeHtml(request.notes)}</span>
+    </div>` : ''}
+  `;
+
+  document.getElementById('viewModal').classList.add('show');
+}
+
+/* =========================
+   MODAL UTILITIES
+========================= */
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('show');
+}
+
+function showLoading(show) {
+  document.getElementById('loadingOverlay').classList.toggle('show', show);
+}
+
+/* =========================
+   UTILITIES
+========================= */
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function formatTime(dateString) {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.classList.remove('show');
+    }
+  });
+});
+
+/* =========================
+   INIT
+========================= */
+document.addEventListener('DOMContentLoaded', () => {
+  loadRequests();
+
+  // Auto-refresh every 30 seconds
+  setInterval(loadRequests, 30000);
+});
+</script>
+
+</body>
+</html>

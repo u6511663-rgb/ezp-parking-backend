@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EZP — ตรวจสอบสถานะ / Check Status</title>
+
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  .wrap{max-width:600px;margin:40px auto;padding:20px}
+  .logo{text-align:center;margin-bottom:30px}
+  .logo h1{font-size:28px;font-weight:800;margin:0}
+  .logo p{color:var(--muted);margin-top:8px}
+
+  .form-container{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    padding:24px;
+    margin-bottom:20px;
+  }
+
+  .form-title{
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:20px;
+    text-align:center;
+  }
+
+  .search-box{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+  }
+  .search-box input{
+    flex:1;
+    padding:12px 14px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.01);
+    color:var(--text);
+    font-size:15px;
+  }
+  .search-box input:focus{
+    outline:none;
+    border-color:var(--accent);
+  }
+  .search-box button{
+    padding:12px 20px;
+    border:none;
+    border-radius:10px;
+    background:var(--accent);
+    color:#000;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .search-box button:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+  }
+
+  /* Status Card */
+  .status-card{
+    background:rgba(255,255,255,0.02);
+    border:1px solid var(--panel-border);
+    border-radius:12px;
+    padding:20px;
+    margin-top:20px;
+  }
+  .status-card.hidden{display:none}
+
+  .status-header{
+    text-align:center;
+    margin-bottom:20px;
+    padding-bottom:20px;
+    border-bottom:1px solid var(--panel-border);
+  }
+
+  .status-badge{
+    display:inline-block;
+    padding:8px 20px;
+    border-radius:20px;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:12px;
+  }
+  .status-badge.pending{
+    background:rgba(255,193,7,0.15);
+    color:#ffc107;
+    border:1px solid rgba(255,193,7,0.3);
+  }
+  .status-badge.approved{
+    background:rgba(0,200,100,0.15);
+    color:#4ade80;
+    border:1px solid rgba(0,200,100,0.3);
+  }
+  .status-badge.rejected{
+    background:rgba(255,80,80,0.15);
+    color:#f87171;
+    border:1px solid rgba(255,80,80,0.3);
+  }
+  .status-badge.checked_in{
+    background:rgba(19,181,211,0.15);
+    color:var(--accent);
+    border:1px solid rgba(19,181,211,0.3);
+  }
+  .status-badge.completed{
+    background:rgba(150,150,150,0.15);
+    color:#9ca3af;
+    border:1px solid rgba(150,150,150,0.3);
+  }
+  .status-badge.cancelled{
+    background:rgba(100,100,100,0.15);
+    color:#6b7280;
+    border:1px solid rgba(100,100,100,0.3);
+  }
+
+  .status-title{
+    font-size:20px;
+    font-weight:700;
+    margin-bottom:4px;
+  }
+  .status-desc{
+    color:var(--muted);
+    font-size:14px;
+  }
+
+  /* Info Grid */
+  .info-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .info-item{
+    background:rgba(255,255,255,0.02);
+    padding:14px;
+    border-radius:10px;
+  }
+  .info-item.full-width{grid-column:1 / -1}
+  .info-label{
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:4px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+  .info-value{
+    font-size:16px;
+    font-weight:600;
+  }
+  .info-value.thai{font-family:'Sarabun', 'Noto Sans Thai', sans-serif}
+
+  /* Slot Assignment */
+  .slot-box{
+    background:linear-gradient(135deg, rgba(0,200,100,0.1), rgba(0,200,100,0.05));
+    border:2px solid rgba(0,200,100,0.3);
+    border-radius:12px;
+    padding:20px;
+    text-align:center;
+    margin-top:20px;
+  }
+  .slot-box.hidden{display:none}
+  .slot-label{
+    font-size:12px;
+    color:#4ade80;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin-bottom:8px;
+  }
+  .slot-code{
+    font-size:36px;
+    font-weight:800;
+    color:#4ade80;
+    letter-spacing:2px;
+  }
+  .slot-location{
+    margin-top:8px;
+    color:var(--muted);
+    font-size:14px;
+  }
+
+  /* QR Code */
+  .qr-section{
+    text-align:center;
+    margin-top:20px;
+    padding-top:20px;
+    border-top:1px solid var(--panel-border);
+  }
+  .qr-section.hidden{display:none}
+  .qr-code{
+    width:180px;
+    height:180px;
+    margin:0 auto;
+    background:#fff;
+    border-radius:12px;
+    padding:10px;
+  }
+  .qr-hint{
+    margin-top:12px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  /* Actions */
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:20px;
+  }
+  .btn{
+    flex:1;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    background:transparent;
+    color:var(--text);
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:all .2s;
+  }
+  .btn:hover{
+    background:rgba(255,255,255,0.05);
+  }
+  .btn-primary{
+    background:var(--accent);
+    color:#000;
+    border:none;
+  }
+  .btn-primary:hover{
+    opacity:.9;
+    background:var(--accent);
+  }
+  .btn-danger{
+    border-color:rgba(255,80,80,0.5);
+    color:#f87171;
+  }
+  .btn-danger:hover{
+    background:rgba(255,80,80,0.1);
+  }
+
+  /* Timeline */
+  .timeline{
+    margin-top:20px;
+    padding-top:20px;
+    border-top:1px solid var(--panel-border);
+  }
+  .timeline-title{
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:16px;
+    color:var(--muted);
+  }
+  .timeline-item{
+    display:flex;
+    gap:12px;
+    margin-bottom:16px;
+    opacity:.5;
+  }
+  .timeline-item.active{opacity:1}
+  .timeline-item.completed{opacity:1}
+  .timeline-dot{
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:var(--panel-border);
+    margin-top:4px;
+    flex-shrink:0;
+  }
+  .timeline-item.active .timeline-dot{
+    background:var(--accent);
+    box-shadow:0 0 0 4px rgba(19,181,211,0.2);
+  }
+  .timeline-item.completed .timeline-dot{
+    background:#4ade80;
+  }
+  .timeline-content{
+    flex:1;
+  }
+  .timeline-label{
+    font-size:14px;
+    font-weight:500;
+  }
+  .timeline-time{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  /* Error message */
+  .error-message{
+    text-align:center;
+    padding:40px;
+    color:var(--muted);
+  }
+  .error-message .icon{
+    font-size:48px;
+    margin-bottom:16px;
+  }
+
+  /* Auto-refresh indicator */
+  .refresh-indicator{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin-top:16px;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .refresh-indicator .dot{
+    width:6px;
+    height:6px;
+    background:#4ade80;
+    border-radius:50%;
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1}
+    50%{opacity:.3}
+  }
+
+  /* Back link */
+  .back-link{
+    display:block;
+    text-align:center;
+    margin-top:20px;
+    color:var(--muted);
+    text-decoration:none;
+    font-size:14px;
+  }
+  .back-link:hover{color:var(--text)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- Logo -->
+  <div class="logo">
+    <h1>🔍 ตรวจสอบสถานะ</h1>
+    <p>Check Your Parking Request Status</p>
+  </div>
+
+  <!-- Search Form -->
+  <div class="form-container">
+    <div class="form-title">ค้นหาคำขอของคุณ / Find Your Request</div>
+
+    <div class="search-box">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="กรอกรหัสคำขอ (Request ID) หรือเบอร์โทรศัพท์"
+        maxlength="50"
+      >
+      <button onclick="searchRequest()" id="searchBtn">ค้นหา / Search</button>
+    </div>
+
+    <div style="text-align:center;color:var(--muted);font-size:13px">
+      ตัวอย่างรหัส: <code style="background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px">550e8400-e29b-41d4-a716-446655440000</code>
+    </div>
+  </div>
+
+  <!-- Status Card -->
+  <div id="statusCard" class="status-card hidden">
+    <!-- Status Header -->
+    <div class="status-header">
+      <div id="statusBadge" class="status-badge pending">⏳ รออนุมัติ</div>
+      <div id="statusTitle" class="status-title">รอการอนุมัติ</div>
+      <div id="statusDesc" class="status-desc">คำขอของคุณอยู่ระหว่างรอการอนุมัติ</div>
+    </div>
+
+    <!-- Info Grid -->
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">ชื่อ / Name</div>
+        <div class="info-value thai" id="infoName">--</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">ทะเบียน / Plate</div>
+        <div class="info-value" id="infoPlate">--</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">เบอร์โทร / Phone</div>
+        <div class="info-value" id="infoPhone">--</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">ส่งคำขอเมื่อ / Submitted</div>
+        <div class="info-value" id="infoSubmitted">--</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">เวลาที่จะมาจอด / Arrival Time</div>
+        <div class="info-value" id="infoArrivalTime" style="color:var(--accent)">--</div>
+      </div>
+      <div class="info-item full-width">
+        <div class="info-label">รหัสคำขอ / Request ID</div>
+        <div class="info-value" id="infoId" style="font-family:monospace;font-size:13px">--</div>
+      </div>
+    </div>
+
+    <!-- Slot Assignment -->
+    <div id="slotBox" class="slot-box hidden">
+      <div class="slot-label">ช่องจอดที่ได้รับ / Assigned Slot</div>
+      <div class="slot-code" id="slotCode">--</div>
+      <div class="slot-location" id="slotLocation">--</div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline">
+      <div class="timeline-title">ความคืบหน้า / Progress</div>
+
+      <div class="timeline-item" id="timelineSubmitted">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-label">ส่งคำขอ / Request Submitted</div>
+          <div class="timeline-time" id="timeSubmitted">--</div>
+        </div>
+      </div>
+
+      <div class="timeline-item" id="timelineApproved">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-label">อนุมัติ / Approved</div>
+          <div class="timeline-time" id="timeApproved">--</div>
+        </div>
+      </div>
+
+      <div class="timeline-item" id="timelineCheckedIn">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-label">เข้าจอด / Checked In</div>
+          <div class="timeline-time" id="timeCheckedIn">--</div>
+        </div>
+      </div>
+
+      <div class="timeline-item" id="timelineCompleted">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-label">เสร็จสิ้น / Completed</div>
+          <div class="timeline-time" id="timeCompleted">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions" id="actionButtons">
+      <button class="btn" onclick="refreshStatus()">🔄 รีเฟรช / Refresh</button>
+      <button class="btn btn-danger" id="cancelBtn" onclick="cancelRequest()">❌ ยกเลิก / Cancel</button>
+    </div>
+
+    <!-- Auto-refresh indicator -->
+    <div class="refresh-indicator">
+      <div class="dot"></div>
+      <span>อัปเดตอัตโนมัติทุก 10 วินาที / Auto-refresh every 10s</span>
+    </div>
+  </div>
+
+  <a href="auth.html" class="back-link">← กลับไปหน้าขอจอดรถ / Back to Request Parking</a>
+</div>
+
+<script>
+let currentRequestId = null;
+let refreshInterval = null;
+
+/* =========================
+   SEARCH REQUEST
+========================= */
+async function searchRequest() {
+  const input = document.getElementById('searchInput').value.trim();
+  if (!input) return;
+
+  // Hide previous results
+  hideAllStates();
+
+  // Determine if input is UUID or phone
+  const isUUID = input.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+
+  try {
+    if (isUUID) {
+      await loadRequest(input);
+    } else {
+      // Search by phone
+      await searchByPhone(input);
+    }
+  } catch (err) {
+    console.error('Search error:', err);
+  }
+}
+
+async function searchByPhone(phone) {
+  try {
+    const response = await fetch(`/api/guest/search?phone=${encodeURIComponent(phone)}`);
+
+    if (!response.ok) {
+      throw new Error('Search failed');
+    }
+
+    const data = await response.json();
+
+    if (data.requests.length === 0) {
+      return;
+    }
+
+    if (data.requests.length === 1) {
+      // Single result, show it directly
+      await loadRequest(data.requests[0].id);
+    } else {
+      // Multiple results, show list (or just load the most recent)
+      await loadRequest(data.requests[0].id);
+    }
+  } catch (err) {
+    console.error('Phone search error:', err);
+  }
+}
+
+async function loadRequest(requestId) {
+  try {
+    const response = await fetch(`/api/guest/request/${requestId}`);
+
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    currentRequestId = data.id;
+    displayRequest(data);
+    startAutoRefresh();
+  } catch (err) {
+    console.error('Load request error:', err);
+  }
+}
+
+/* =========================
+   DISPLAY REQUEST
+========================= */
+function displayRequest(data) {
+  hideAllStates();
+  document.getElementById('statusCard').classList.remove('hidden');
+
+  // Update status badge
+  const badge = document.getElementById('statusBadge');
+  const title = document.getElementById('statusTitle');
+  const desc = document.getElementById('statusDesc');
+
+  const statusConfig = {
+    pending: {
+      badge: '⏳ รออนุมัติ / Pending',
+      title: 'รอการอนุมัติ / Pending Approval',
+      desc: 'คำขอของคุณอยู่ระหว่างรอการอนุมัติจากเจ้าหน้าที่ / Your request is waiting for approval',
+      class: 'pending'
+    },
+    approved: {
+      badge: '✅ ยืนยันแล้ว / Confirmed',
+      title: 'ได้รับการยืนยัน / Confirmed',
+      desc: 'คำขอได้รับการยืนยันแล้ว กรุณาเข้าจอดตามช่องที่กำหนด / Your request is confirmed. Please park at the assigned slot',
+      class: 'approved'
+    },
+    rejected: {
+      badge: '❌ ถูกปฏิเสธ / Rejected',
+      title: 'ถูกปฏิเสธ / Rejected',
+      desc: data.rejection_reason || 'คำขอถูกปฏิเสธ / Request was rejected',
+      class: 'rejected'
+    },
+    checked_in: {
+      badge: '🅿️ จอดรถแล้ว / Checked In',
+      title: 'เข้าจอดแล้ว / Checked In',
+      desc: 'คุณได้เข้าจอดเรียบร้อยแล้ว / You have checked in',
+      class: 'checked_in'
+    },
+    completed: {
+      badge: '✔️ เสร็จสิ้น / Completed',
+      title: 'เสร็จสิ้น / Completed',
+      desc: 'การจอดรถเสร็จสมบูรณ์ / Parking completed',
+      class: 'completed'
+    },
+    cancelled: {
+      badge: '🚫 ยกเลิก / Cancelled',
+      title: 'ยกเลิกแล้ว / Cancelled',
+      desc: 'คำขอถูกยกเลิก / Request was cancelled',
+      class: 'cancelled'
+    }
+  };
+
+  const config = statusConfig[data.status] || statusConfig.pending;
+  badge.className = 'status-badge ' + config.class;
+  badge.textContent = config.badge;
+  title.textContent = config.title;
+  desc.textContent = config.desc;
+
+  // Update info
+  document.getElementById('infoName').textContent = data.full_name;
+  document.getElementById('infoPlate').textContent = data.license_plate;
+  document.getElementById('infoPhone').textContent = data.phone || '-';
+  document.getElementById('infoSubmitted').textContent = formatDate(data.requested_at);
+  document.getElementById('infoArrivalTime').textContent = data.arrival_time ? formatDate(data.arrival_time) : '-';
+  document.getElementById('infoId').textContent = data.id;
+
+  // Show slot if assigned
+  const slotBox = document.getElementById('slotBox');
+  if (data.slot && data.slot.code) {
+    slotBox.classList.remove('hidden');
+    document.getElementById('slotCode').textContent = data.slot.code;
+    document.getElementById('slotLocation').textContent = `${data.slot.floor_name} (Floor ${data.slot.floor})`;
+  } else {
+    slotBox.classList.add('hidden');
+  }
+
+  // Update timeline
+  updateTimeline(data);
+
+  // Show/hide cancel button
+  const cancelBtn = document.getElementById('cancelBtn');
+  if (['pending', 'approved'].includes(data.status)) {
+    cancelBtn.classList.remove('hidden');
+  } else {
+    cancelBtn.classList.add('hidden');
+  }
+}
+
+function updateTimeline(data) {
+  const statuses = ['submitted', 'approved', 'checked_in', 'completed'];
+  const currentIndex = statuses.indexOf(data.status === 'rejected' || data.status === 'cancelled' ? '' : data.status);
+
+  statuses.forEach((status, index) => {
+    const item = document.getElementById(`timeline${status.charAt(0).toUpperCase() + status.slice(1)}`);
+    const timeEl = document.getElementById(`time${status.charAt(0).toUpperCase() + status.slice(1)}`);
+
+    // Skip if elements don't exist
+    if (!item || !timeEl) return;
+
+    item.classList.remove('active', 'completed');
+
+    const timeValue = data[status === 'submitted' ? 'requested_at' : `${status}_at`];
+    if (timeValue) {
+      timeEl.textContent = formatDate(timeValue);
+      item.classList.add('completed');
+    } else {
+      timeEl.textContent = '--';
+    }
+
+    if (index === currentIndex) {
+      item.classList.add('active');
+    }
+  });
+}
+
+/* =========================
+   ACTIONS
+========================= */
+async function refreshStatus() {
+  if (!currentRequestId) return;
+
+  try {
+    const response = await fetch(`/api/guest/request/${currentRequestId}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return; // Don't show error on refresh, just stop
+      }
+      throw new Error('Failed to refresh');
+    }
+
+    const data = await response.json();
+    // Update only the data without full re-render to avoid flicker
+    updateRequestData(data);
+  } catch (err) {
+    console.error('Refresh error:', err);
+    // Silent fail on refresh - don't show error to avoid flicker
+  }
+}
+
+function updateRequestData(data) {
+  // Update only changed elements without full re-render to prevent flickering
+  currentRequestId = data.id;
+
+  const statusConfig = {
+    pending: {
+      badge: '⏳ รออนุมัติ / Pending',
+      title: 'รอการอนุมัติ / Pending Approval',
+      desc: 'คำขอของคุณอยู่ระหว่างรอการอนุมัติจากเจ้าหน้าที่ / Your request is waiting for approval',
+      class: 'pending'
+    },
+    approved: {
+      badge: '✅ ยืนยันแล้ว / Confirmed',
+      title: 'ได้รับการยืนยัน / Confirmed',
+      desc: 'คำขอได้รับการยืนยันแล้ว กรุณาเข้าจอดตามช่องที่กำหนด / Your request is confirmed. Please park at the assigned slot',
+      class: 'approved'
+    },
+    rejected: {
+      badge: '❌ ถูกปฏิเสธ / Rejected',
+      title: 'ถูกปฏิเสธ / Rejected',
+      desc: data.rejection_reason || 'คำขอถูกปฏิเสธ / Request was rejected',
+      class: 'rejected'
+    },
+    checked_in: {
+      badge: '🅿️ จอดรถแล้ว / Checked In',
+      title: 'เข้าจอดแล้ว / Checked In',
+      desc: 'คุณได้เข้าจอดเรียบร้อยแล้ว / You have checked in',
+      class: 'checked_in'
+    },
+    completed: {
+      badge: '✔️ เสร็จสิ้น / Completed',
+      title: 'เสร็จสิ้น / Completed',
+      desc: 'การจอดรถเสร็จสมบูรณ์ / Parking completed',
+      class: 'completed'
+    },
+    cancelled: {
+      badge: '🚫 ยกเลิก / Cancelled',
+      title: 'ยกเลิกแล้ว / Cancelled',
+      desc: 'คำขอถูกยกเลิก / Request was cancelled',
+      class: 'cancelled'
+    }
+  };
+
+  const config = statusConfig[data.status];
+  if (!config) return;
+
+  // Update status badge
+  const badge = document.getElementById('statusBadge');
+  if (badge) {
+    badge.className = 'status-badge ' + config.class;
+    badge.textContent = config.badge;
+  }
+
+  // Update title and description
+  const title = document.getElementById('statusTitle');
+  const desc = document.getElementById('statusDesc');
+  if (title) title.textContent = config.title;
+  if (desc) desc.textContent = config.desc;
+
+  // Update slot info if assigned
+  const slotBox = document.getElementById('slotBox');
+  if (data.slot && data.slot.code && slotBox) {
+    slotBox.classList.remove('hidden');
+    const slotCode = document.getElementById('slotCode');
+    const slotLocation = document.getElementById('slotLocation');
+    if (slotCode) slotCode.textContent = data.slot.code;
+    if (slotLocation) slotLocation.textContent = data.slot.floor_name || '';
+  }
+}
+
+async function cancelRequest() {
+  if (!currentRequestId) return;
+
+  if (!confirm('คุณต้องการยกเลิกคำขอนี้ใช่หรือไม่? / Are you sure you want to cancel this request?')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/guest/request/${currentRequestId}/cancel`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      alert('ยกเลิกคำขอสำเร็จ / Request cancelled successfully');
+      await refreshStatus();
+    } else {
+      const data = await response.json();
+      alert(data.message || 'ไม่สามารถยกเลิกคำขอได้ / Cannot cancel request');
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด / An error occurred');
+  }
+}
+
+/* =========================
+   UTILITIES
+========================= */
+function formatDate(dateString) {
+  if (!dateString) return '--';
+  const date = new Date(dateString);
+  return date.toLocaleString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function hideAllStates() {
+  document.getElementById('statusCard').classList.add('hidden');
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshInterval = setInterval(refreshStatus, 30000); // Refresh every 30 seconds
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+}
+
+/* =========================
+   INIT
+========================= */
+document.addEventListener('DOMContentLoaded', () => {
+  // Check for request ID in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const requestId = urlParams.get('id');
+
+  if (requestId) {
+    document.getElementById('searchInput').value = requestId;
+    searchRequest();
+  }
+
+  // Allow Enter key to search
+  document.getElementById('searchInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') searchRequest();
+  });
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', stopAutoRefresh);
+</script>
+
+</body>
+</html>

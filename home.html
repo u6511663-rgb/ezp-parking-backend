@@ -144,12 +144,23 @@
     <div id="detailList"></div>
   </div>
 
+  <!-- Quick Actions -->
+  <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <button class="view-btn" onclick="location='auth.html'" style="padding:16px;text-align:center">
+      <div style="font-size:24px">🚗</div>
+      <div style="font-weight:600;margin-top:8px">ขอจองรถ / Reserve Parking</div>
+    </button>
+    <button class="view-btn" onclick="location='guest-status.html'" style="padding:16px;text-align:center">
+      <div style="font-size:24px">🔍</div>
+      <div style="font-weight:600;margin-top:8px">ตรวจสอบสถานะ / Check Status</div>
+    </button>
+  </div>
+
 </div>
 
 <!-- Bottom Nav -->
 <div class="bottom-nav">
   <button class="nav-btn active" data-page="home" onclick="location='home.html'">Home</button>
-  <button class="nav-btn" data-page="alerts" onclick="location='alerts.html'">Alerts</button>
   <button class="nav-btn" data-page="settings" onclick="location='settings.html'">Settings</button>
 </div>
 
@@ -160,7 +171,7 @@ const FLOORS = [
 ];
 
 /* =========================
-   LOAD FLOOR STATS
+   LOAD FLOOR STATS from parking_slots
 ========================= */
 async function loadFloorStats() {
   const fallback = {
@@ -168,105 +179,131 @@ async function loadFloorStats() {
     F2: { total: 3, occupied: 0, free: 3 }
   };
 
-  const responses = await Promise.all(
-    [1, 2].map(async (floorId, index) => {
-      const response = await fetch(`/api/floors/${floorId}/slots`, {
-        headers: { Accept: "application/json" }
-      });
+  try {
+    // Fetch all slots from parking_slots table
+    const response = await fetch('/api/slots');
+    if (!response.ok) throw new Error('Failed to load slots');
 
-      if (!response.ok) {
-        throw new Error(`Unable to load floor ${floorId}`);
+    const slots = await response.json();
+
+    // Group by floor
+    const floorStats = { F1: { total: 0, occupied: 0, free: 0 }, F2: { total: 0, occupied: 0, free: 0 } };
+
+    slots.forEach(slot => {
+      const floorId = slot.floor_id === 1 ? 'F1' : slot.floor_id === 2 ? 'F2' : null;
+      if (!floorId) return;
+
+      floorStats[floorId].total++;
+      if (slot.status === 'occupied') {
+        floorStats[floorId].occupied++;
+      } else {
+        floorStats[floorId].free++;
       }
+    });
 
-      const slots = await response.json();
-      const total = Array.isArray(slots) ? slots.length : 0;
-      const occupied = Array.isArray(slots)
-        ? slots.filter((slot) => slot.status === "occupied").length
-        : 0;
-
-      return [FLOORS[index].id, { total, occupied, free: total - occupied }];
-    })
-  ).catch((error) => {
+    return floorStats;
+  } catch (error) {
     console.error("floor stats error", error);
-    return null;
-  });
-
-  if (!responses) {
     return fallback;
   }
-
-  return Object.fromEntries(responses);
 }
 
 /* =========================
    RENDER HOME
 ========================= */
+let previousStats = null;
+
 async function renderHome() {
   const big = document.getElementById("bigCards");
   const detail = document.getElementById("detailList");
 
-  big.innerHTML = "";
-  detail.innerHTML = "<div style='color:var(--muted)'>Loading...</div>";
-
   try {
     const stats = await loadFloorStats();
 
-    detail.innerHTML = "";
+    // Check if data actually changed to avoid flicker
+    if (previousStats && JSON.stringify(previousStats) === JSON.stringify(stats)) {
+      // Only update timestamp
+      document.querySelectorAll('.update-time').forEach(el => {
+        el.textContent = new Date().toLocaleTimeString();
+      });
+      return;
+    }
+    previousStats = stats;
 
-    const bigFrag = document.createDocumentFragment();
-    const detailFrag = document.createDocumentFragment();
+    // First render - create elements
+    if (big.innerHTML === '') {
+      const bigFrag = document.createDocumentFragment();
+      const detailFrag = document.createDocumentFragment();
 
-    FLOORS.forEach((floor) => {
-      const stat = stats[floor.id] || { total: 0, occupied: 0, free: 0 };
-      const occPct = stat.total
-        ? Math.round((stat.occupied / stat.total) * 100)
-        : 0;
+      FLOORS.forEach((floor) => {
+        const stat = stats[floor.id] || { total: 0, occupied: 0, free: 0 };
+        const occPct = stat.total ? Math.round((stat.occupied / stat.total) * 100) : 0;
 
-      const bigCard = document.createElement("div");
-      bigCard.className = "big-card";
-      bigCard.innerHTML = `
-        <div>
-          <div class="title">${floor.name}</div>
-          <div class="count">${stat.free} / ${stat.total}</div>
-          <div class="sub">${floor.subtitle}</div>
-        </div>
-        <button class="view-btn"
-          onclick="location='floor.html#${floor.id}'">
-          View
-        </button>
-      `;
-      bigFrag.appendChild(bigCard);
-
-      const detailItem = document.createElement("div");
-      detailItem.className = "detail-item";
-      detailItem.innerHTML = `
-        <div class="detail-left">
-          <div class="badge">${floor.id}</div>
+        const bigCard = document.createElement("div");
+        bigCard.className = "big-card";
+        bigCard.id = `card-${floor.id}`;
+        bigCard.innerHTML = `
           <div>
-            <div style="font-weight:800">${floor.name}</div>
-            <div style="color:var(--accent);margin-top:6px">
-              Free ${stat.free} / ${stat.total}
+            <div class="title">${floor.name}</div>
+            <div class="count" id="count-${floor.id}">${stat.free} / ${stat.total}</div>
+            <div class="sub">${floor.subtitle}</div>
+          </div>
+          <button class="view-btn" onclick="location='floor.html#${floor.id}'">View</button>
+        `;
+        bigFrag.appendChild(bigCard);
+
+        const detailItem = document.createElement("div");
+        detailItem.className = "detail-item";
+        detailItem.id = `detail-${floor.id}`;
+        detailItem.innerHTML = `
+          <div class="detail-left">
+            <div class="badge">${floor.id}</div>
+            <div>
+              <div style="font-weight:800">${floor.name}</div>
+              <div style="color:var(--accent);margin-top:6px" id="free-${floor.id}">
+                Free ${stat.free} / ${stat.total}
+              </div>
             </div>
           </div>
-        </div>
-        <div style="text-align:right">
-          <div style="color:var(--muted);font-size:12px">
-            ${new Date().toLocaleTimeString()}
+          <div style="text-align:right">
+            <div style="color:var(--muted);font-size:12px" class="update-time">
+              ${new Date().toLocaleTimeString()}
+            </div>
+            <div class="progress">
+              <span id="progress-${floor.id}" style="width:${occPct}%"></span>
+            </div>
           </div>
-          <div class="progress">
-            <span style="width:${occPct}%"></span>
-          </div>
-        </div>
-      `;
-      detailFrag.appendChild(detailItem);
-    });
+        `;
+        detailFrag.appendChild(detailItem);
+      });
 
-    big.appendChild(bigFrag);
-    detail.appendChild(detailFrag);
+      big.appendChild(bigFrag);
+      detail.appendChild(detailFrag);
+    } else {
+      // Update only changed values
+      FLOORS.forEach((floor) => {
+        const stat = stats[floor.id] || { total: 0, occupied: 0, free: 0 };
+        const occPct = stat.total ? Math.round((stat.occupied / stat.total) * 100) : 0;
+
+        const countEl = document.getElementById(`count-${floor.id}`);
+        const freeEl = document.getElementById(`free-${floor.id}`);
+        const progressEl = document.getElementById(`progress-${floor.id}`);
+
+        if (countEl) countEl.textContent = `${stat.free} / ${stat.total}`;
+        if (freeEl) freeEl.textContent = `Free ${stat.free} / ${stat.total}`;
+        if (progressEl) progressEl.style.width = `${occPct}%`;
+      });
+
+      // Update timestamps
+      document.querySelectorAll('.update-time').forEach(el => {
+        el.textContent = new Date().toLocaleTimeString();
+      });
+    }
   } catch (err) {
     console.error(err);
-    detail.innerHTML =
-      "<div style='color:red'>Connection error to Supabase</div>";
+    if (detail.innerHTML === '') {
+      detail.innerHTML = "<div style='color:red'>Connection error to Supabase</div>";
+    }
   }
 }
 
@@ -275,6 +312,6 @@ async function renderHome() {
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
   renderHome();
-  setInterval(renderHome, 3000);
+  setInterval(renderHome, 10000); // Refresh every 10 seconds
 });
 </script>
